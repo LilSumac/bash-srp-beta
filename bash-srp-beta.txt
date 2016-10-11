@@ -1,0 +1,6 @@
+"bash-srp-beta"
+{
+	"base"		"sandbox"
+	"title"		"#!/BASH/SRP"
+	"author"	"LilSumac"
+}
