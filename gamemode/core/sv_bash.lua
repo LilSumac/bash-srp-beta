@@ -3,12 +3,7 @@ local BASH = BASH;
 function BASH:Init()
 	if self.Initialized then return end;
 
-	self.Commands:Init();
-	self.Config:Init();
-	self.Modules:Init();
-	self.Ranks:Init();
-	self.Registry:Init();
-	self.SQL:Init();
+	self:LibInit();
 
 	MsgCon(color_green, true, "Successfully initialized server-side. Init time: %f seconds.", math.Round(SysTime() - self.StartTime, 5));
 	self.Initialized = true;

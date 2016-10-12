@@ -6,9 +6,6 @@ BASH.Commands.Entries = BASH.Commands.sEntries or {};
 BASH.Commands.Dependencies = {["Ranks"] = true, ["SQL"] = SERVER};
 
 function BASH.Commands:Init()
-    MsgCon(color_green, true, "Initializing commands...");
-    if !BASH:LibDepMet(self) then return end;
-
     local comm = {
         ID = "initconfig",
         Name = "Initialize Config",
@@ -87,8 +84,6 @@ function BASH.Commands:Init()
     self:AddEntry(comm);
 
     hook.Call("LoadCommands", BASH);
-
-    MsgCon(color_green, true, "Command initialization complete!");
 end
 
 function BASH.Commands:AddEntry(commTab)
@@ -199,3 +194,5 @@ function(cmd, args)
 
     return results;
 end);
+
+BASH:RegisterLib(BASH.Commands);

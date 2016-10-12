@@ -8,24 +8,8 @@ BASH.Registry.Dependencies = {["SQL"] = SERVER};
 local Player = FindMetaTable("Player");
 
 function BASH.Registry:Init()
-    MsgCon(color_green, true, "Initializing registry...");
-    if !BASH:LibDepMet(self) then return end;
-
     /*
     **  Create Default Variables
-    **  Args: Name, Type, Default Value, Is Public, SQL Source Table
-    **
-    **  Note: 'boolean' type variables must be registered with a
-    **  default value of 0 (false) or 1 (true).
-    **
-    **  Note: Public variables are sent to all connected clients,
-    **  while non-public variables are only sent to individual
-    **  clients. Keep in mind that all variables are sent to staff
-    **  members, regardless of whether or not they are public.
-    **
-    **  Note: The SQL Source Table argument is used to assign the
-    **  value a home table, i.e. the SQL table in which this
-    **  variable is saved in.
     */
 
     BASH.Registry:NewVariable("BASHID",     "string", "BASH_ID",    true, "bash_players");
@@ -33,10 +17,24 @@ function BASH.Registry:Init()
     BASH.Registry:NewVariable("SteamID",    "string", "STEAM_ID",   true, "bash_players");
     BASH.Registry:NewVariable("Rank",       "string", "default",    true, "bash_players");
     hook.Call("LoadVariables");
-
-    MsgCon(color_green, true, "Registry initialization complete!");
 end
 
+/*
+**  BASH.Registry.NewVariable
+**  Args: Name, Type, Default Value, Is Public, SQL Source Table
+**
+**  Note: 'boolean' type variables must be registered with a
+**  default value of 0 (false) or 1 (true).
+**
+**  Note: Public variables are sent to all connected clients,
+**  while non-public variables are only sent to individual
+**  clients. Keep in mind that all variables are sent to staff
+**  members, regardless of whether or not they are public.
+**
+**  Note: The SQL Source Table argument is used to assign the
+**  value a home table, i.e. the SQL table in which this
+**  variable is saved in.
+*/
 function BASH.Registry:NewVariable(name, type, default, public, sqlTable)
     if !name or !type or !default then return end;
     if SERVER and sqlTable then
@@ -246,3 +244,5 @@ elseif SERVER then
     util.AddNetworkString("BASH_REGISTRY_PROGRESS");
     util.AddNetworkString("BASH_REGISTRY_QUEUED");
 end
+
+BASH:RegisterLib(BASH.Registry);

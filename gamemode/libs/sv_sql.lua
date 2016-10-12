@@ -428,3 +428,5 @@ concommand.Add("bash_nodrop", function(ply, cmd, args)
         MsgCon(color_sql, true, "Old columns will not be dropped from table with ID '%s'.", tabID);
     end
 end);
+
+BASH:RegisterLib(BASH.SQL);

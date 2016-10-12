@@ -7,23 +7,7 @@ cookie.GetBoolean = cookie.GetBoolean or cookie.GetNumber;
 function BASH.Cookies:Init()
     /*
     **  Create Default Cookies
-    **
-    **  Note: Cookies are like registry variables, only they are
-    **  exclusively stored client-side. They persist the same way
-    **  and are much less of an expense, due to the fact that they
-    **  are stored and changed only on the client. Try using
-    **  cookies for client settings that don't need to be known by
-    **  the server, such as GUI themes, logging preferences, or
-    **  other miscellaneous settings.
-    **
-    **  Note: The 'Type' table key must either be "String",
-    **  "Number", or "Boolean". "Boolean"-type cookies will be
-    **  stored as a number in the cl.db file, but will be de-typed
-    **  when retrieved or stored.
     */
-
-    MsgCon(color_green, true, "Initializing cookies...");
-    if !BASH:LibDepMet(self) then return end;
 
     local cook = {
         ID = "text_size",
@@ -90,10 +74,25 @@ function BASH.Cookies:Init()
     self:AddCookie(cook);
 
     hook.Call("LoadCookies", BASH);
-
-    MsgCon(color_green, true, "Cookie initialization complete!");
 end
 
+/*
+**  BASH.Cookies.AddCookie
+**  Args: {Cookie Structure Table}
+**
+**  Note: Cookies are like registry variables, only they are
+**  exclusively stored client-side. They persist the same way
+**  and are much less of an expense, due to the fact that they
+**  are stored and changed only on the client. Try using
+**  cookies for client settings that don't need to be known by
+**  the server, such as GUI themes, logging preferences, or
+**  other miscellaneous settings.
+**
+**  Note: The 'Type' table key must either be "String",
+**  "Number", or "Boolean". "Boolean"-type cookies will be
+**  stored as a number in the cl.db file, but will be de-typed
+**  when retrieved or stored.
+*/
 function BASH.Cookies:AddCookie(cook)
     if !cook.ID or !cook.Type then return end;
 
@@ -105,9 +104,10 @@ function BASH.Cookies:AddCookie(cook)
     cook.Name =         cook.Name or "Unknown Cookie";
     cook.Desc =         cook.Desc or "";
     cook.Default =      cook.Default or 0;
+    cook.Hidden =       cook.Hidden or false;
     cook.AccessLevel =  cook.AccessLevel or 0;
-    cook.MenuElement =  cook.MenuElement or "DNumberWang";
-    if cook.Type == "Number" then
+    cook.MenuElement =  cook.MenuElement or (cook.Type == "Number" and "DNumberWang") or (cook.Type == "String" and "BTextEntry") or "DCheckBox";
+    if cook.Type != "Boolean" then
         cook.Min = cook.Min or 0;
         cook.Max = cook.Max or 1;
     end
@@ -139,3 +139,5 @@ function BASH.Cookies:Set(id, value)
     cookie.Set(id, detype(value, "string"));
     MsgDebug(color_cookie, true, "Cookie '%s' set to '%s'.", id, detype(value, "string"));
 end
+
+BASH:RegisterLib(BASH.Cookies);

@@ -9,15 +9,7 @@ BASH.Config.Dependencies = {["GUI"] = CLIENT};
 function BASH.Config:Init()
     /*
     **  Create Default Config Entries
-    **
-    **  Note: Config is used for storing settings used exclusively
-    **  by the server that can be changed by authorized players.
-    **  They are saved in a text file on the server in a JSON
-    **  format for ease of use/saving.
     */
-
-    MsgCon(color_green, true, "Initializing config...");
-    if !BASH:LibDepMet(self) then return end;
 
     /*
     **  General Settings
@@ -98,6 +90,9 @@ function BASH.Config:Init()
     };
     self:AddEntry(conf);
 
+    /*
+    **  Developer Settings
+    */
     conf = {
         ID = "debug_enabled",
         Group = "Developer",
@@ -108,12 +103,52 @@ function BASH.Config:Init()
         Default = false,
         AccessLevel = 100
     };
+    self:AddEntry(conf);
 
     hook.Call("LoadConfig", BASH);
-    if CLIENT then MsgCon(color_green, true, "Config initialization complete!") return end;
-    self:Load();
+    if SERVER then self:Load() end;
+end
 
-    MsgCon(color_green, true, "Config initialization complete!");
+/*
+**  BASH.Config.AddEntry
+**  Args: {Config Structure Table}
+**
+**  Note: Config is used for storing settings used exclusively
+**  by the server that can be changed by authorized players.
+**  They are saved in a text file on the server in a JSON
+**  format for ease of use/saving.
+*/
+function BASH.Config:AddEntry(confTab)
+    if !confTab then return end;
+    if !confTab.ID then
+        MsgErr("[BASH.Config:AddEntry(%s)]: Tried adding a config entry with no ID into group '%s'!", concatArgs(confTab), confTab.Group or "Unsorted");
+        return;
+    end
+    if self.IDRef[confTab.ID] then
+        local exists = self.IDRef[confTab.ID];
+        MsgErr(color_red, "A config entry with the ID '%s' already exists in group '%s'!", confTab.ID, exists.Group);
+        return;
+    end
+
+    confTab.Group =         confTab.Group or "Unsorted";
+    confTab.Name =          confTab.Name or "Unknown Entry";
+    confTab.Desc =          confTab.Desc or "";
+    confTab.Type =          confTab.Type or "Number";
+    confTab.MenuElement =   confTab.MenuElement or "DNumberWang";
+    confTab.Default =       confTab.Default or 0;
+    confTab.AccessLevel =   confTab.AccessLevel or 100;
+    if confTab.Type == "Number" then
+        confTab.Min = confTab.Min or 0;
+        confTab.Max = confTab.Max or 1;
+    end
+    if confTab.MenuElement == "DComboBox" then
+        confTab.Options = confTab.Options or {"Option 1", "Option 2"};
+    end
+
+    self.Entries[confTab.Group] = self.Entries[confTab.Group] or {};
+    local len = #self.Entries[confTab.Group];
+    self.Entries[confTab.Group][len + 1] = confTab;
+    self.IDRef[confTab.ID] = self.Entries[confTab.Group][len + 1];
 end
 
 function BASH.Config:Load()
@@ -156,43 +191,6 @@ function BASH.Config:Send(recipients)
 
 end
 
-function BASH.Config:Exit()
-    MsgCon(color_green, true, "Saving config...");
-end
-
-function BASH.Config:AddEntry(confTab)
-    if !confTab then return end;
-    if !confTab.ID then
-        MsgErr("[BASH.Config:AddEntry(%s)]: Tried adding a config entry with no ID into group '%s'!", concatArgs(confTab), confTab.Group or "Unsorted");
-        return;
-    end
-    if self.IDRef[confTab.ID] then
-        local exists = self.IDRef[confTab.ID];
-        MsgErr(color_red, "A config entry with the ID '%s' already exists in group '%s'!", confTab.ID, exists.Group);
-        return;
-    end
-
-    confTab.Group =         confTab.Group or "Unsorted";
-    confTab.Name =          confTab.Name or "Unknown Entry";
-    confTab.Desc =          confTab.Desc or "";
-    confTab.Type =          confTab.Type or "Number";
-    confTab.MenuElement =   confTab.MenuElement or "DNumberWang";
-    confTab.Default =       confTab.Default or 0;
-    confTab.AccessLevel =   confTab.AccessLevel or 100;
-    if confTab.Type == "Number" then
-        confTab.Min = confTab.Min or 0;
-        confTab.Max = confTab.Max or 1;
-    end
-    if confTab.MenuElement == "DComboBox" then
-        confTab.Options = confTab.Options or {"Option 1", "Option 2"};
-    end
-
-    self.Entries[confTab.Group] = self.Entries[confTab.Group] or {};
-    local len = #self.Entries[confTab.Group];
-    self.Entries[confTab.Group][len + 1] = confTab;
-    self.IDRef[confTab.ID] = self.Entries[confTab.Group][len + 1];
-end
-
 function BASH.Config:Get(id)
     if !self.IDRef[id] then
         MsgErr("[BASH.Config:Get(%s)]: Tried to fetch a non-existant config entry!", id);
@@ -209,6 +207,10 @@ function BASH.Config:Set(id, value)
         return nil;
     end
     self.IDRef[id].Value = value;
+end
+
+function BASH.Config:Exit()
+    MsgCon(color_green, true, "Saving config...");
 end
 
 if CLIENT then
@@ -265,3 +267,5 @@ elseif SERVER then
         BASH.Config.SettingUp = false;
     end);
 end
+
+BASH:RegisterLib(BASH.Config);

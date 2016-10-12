@@ -9,8 +9,7 @@ function BASH.Flags:Init()
     **  Create Default Flags
     */
 
-    MsgCon(color_green, true, "Initializing flags...");
-    if !BASH:LibDepMet(self) then return end;
-
-    MsgCon(color_green, true, "Initializing flags complete!");
+    
 end
+
+BASH:RegisterLib(BASH.Flags);

@@ -4,13 +4,8 @@ BASH.Modules.Name = "Modules";
 BASH.Modules.Loaded = {};
 
 function BASH.Modules:Init()
-    MsgCon(color_green, true, "Initializing modules...");
-    if !BASH:LibDepMet(self) then return end;
-
     self:LoadFromDir(engine.ActiveGamemode() .. "/gamemode/modules");
     hook.Run("InitModules");
-
-    MsgCon(color_green, true, "Module initialization complete!");
 end
 
 function BASH.Modules:Load(modID, modPath, isSingleFile)
@@ -57,3 +52,5 @@ function BASH.Modules:LoadFromDir(modPath)
         self:Load(string.StripExtension(mod), modPath .. "/" .. mod, true);
     end
 end
+
+BASH:RegisterLib(BASH.Modules);

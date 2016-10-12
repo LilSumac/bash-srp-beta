@@ -6,9 +6,6 @@ BASH.Themes.PushOnInit = BASH.Themes.PushOnInit or false;
 BASH.Themes.Dependencies = {["Cookies"] = CLIENT};
 
 function BASH.Themes:Init()
-    MsgCon(color_green, true, "Initializing themes...");
-    if !BASH:LibDepMet(self) then return end;
-
     local theme = {
         ID = "bash_dusk",
         Name = "BASH Dusk Theme",
@@ -38,8 +35,6 @@ function BASH.Themes:Init()
     self:AddEntry(theme);
 
     hook.Call("LoadThemes", BASH);
-
-    MsgCon(color_green, true, "Theme initialization complete!");
 end
 
 function BASH.Themes:AddEntry(theme)
@@ -115,3 +110,5 @@ hook.Add("OnInit", "PushThemesOnInit", function()
 
     BASH.Themes.PushOnInit = false;
 end);
+
+BASH:RegisterLib(BASH.Themes);

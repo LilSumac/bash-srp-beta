@@ -1,0 +1,26 @@
+[[
+    DATA TABLE STRUCTURES
+]]
+
+[A '*' means that the field is REQUIRED.]
+[The table fields are CASE-SENSITIVE. 'Name' != 'name']
+
+____________ BASH.Cookies ____________
+
+Cookie Structure Table = {
+    *ID: A unique identifier for the cookie. An error will be
+        thrown if a cookie already exists with that ID.
+    *Type: The variable type of the cookie. Can either be a
+        'Number', 'Boolean', or 'String'.
+    Name: A readable name for the cookie.
+    Desc: A readable description for the cookie.
+    Default: The default value for the cookie.
+    Hidden: Whether or not the cookie is editable by the client.
+    AccessLevel: The access level needed to edit the cookie.
+    MenuElement: The GUI element used for editing this cookie.
+    Min: The minimum value of the cookie. Only applicable for
+    numbers.
+    Max: The maximum value of the cookie. Only applicable for
+    numbers.
+    Options: The options 
+}

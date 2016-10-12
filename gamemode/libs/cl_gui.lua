@@ -6,8 +6,9 @@ BASH.GUI.Opened = {};
 BASH.GUI.Minimized = {};
 
 function BASH.GUI:Init()
-    MsgCon(color_green, true, "Initializing GUI...");
-    if !BASH:LibDepMet(self) then return end;
+    /*
+    **  Create Default GUI Elements
+    */
 
     local gui = {
         ID = "menu_config",
@@ -16,7 +17,7 @@ function BASH.GUI:Init()
     };
     self:AddEntry(gui);
 
-    MsgCon(color_green, true, "GUI initialization complete!");
+    hook.Call("LoadGUI", BASH);
 end
 
 function BASH.GUI:AddEntry(guiTab)
@@ -73,3 +74,5 @@ function BASH.GUI:Minimize(id)
         return;
     end
 end
+
+BASH:RegisterLib(BASH.GUI);

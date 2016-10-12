@@ -10,9 +10,6 @@ function BASH.Ranks:Init()
     **  Create Default Ranks
     */
 
-    MsgCon(color_green, true, "Initializing ranks...");
-    if !BASH:LibDepMet(self) then return end;
-
     local rank = {
         ID = "owner",
         Name = "Owner",
@@ -51,8 +48,6 @@ function BASH.Ranks:Init()
         AccessLevel = 0
     };
     self:NewRank(rank);
-
-    MsgCon(color_green, true, "Initializing ranks complete!");
 end
 
 function BASH.Ranks:NewRank(rankTab)
@@ -94,3 +89,5 @@ end
 function Player:GetAccessLevel()
 	return BASH.Ranks.Entries[self:GetRank()].AccessLevel;
 end
+
+BASH:RegisterLib(BASH.Ranks);

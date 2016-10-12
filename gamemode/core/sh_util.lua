@@ -182,6 +182,29 @@ function BASH:ProcessCore(directory)
 	end
 end
 
+function BASH:RegisterLib(lib)
+    if !lib then return end;
+
+    if !self.Libraries then
+        self.Libraries = {};
+    end
+    lib.Name = lib.Name or "Unnamed Library$" .. randomString(8);
+    self.Libraries[lib.Name] = lib;
+    MsgCon(color_green, true, "Registered '%s' library.", lib.Name);
+end
+
+function BASH:LibInit()
+    if !self.Libraries then return end;
+
+    for name, lib in pairs(self.Libraries) do
+        if !self:LibDepMet(self) then continue end;
+        if !lib.Init then continue end;
+        MsgCon(color_green, true, "Initializing '%s' library...", lib.Name);
+        lib:Init();
+        MsgCon(color_green, true, "'%s' initialization complete!", lib.Name);
+    end
+end
+
 function BASH:LibDepMet(lib)
     if !lib.Dependencies or table.Count(lib.Dependencies) == 0 then return true end;
 
