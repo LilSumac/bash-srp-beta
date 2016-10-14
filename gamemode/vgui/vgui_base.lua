@@ -18,22 +18,17 @@ function PANEL:Init()
 
     self.Content = vgui.Create("Panel", self);
     self.Content:SetVisible(false);
-    self.Content.Paint = function(_self, w, h)
-        draw.SimpleText("CONTENT", "ChatFont", w / 2, h / 2, color_white, TEXT_CENT, TEXT_CENT);
-    end
+    self.Content.Paint = function() end;
     self.Sidebar = vgui.Create("Panel", self);
     self.Sidebar:SetVisible(false);
-    self.Sidebar.Paint = function(_self, w, h)
-        surface.SetDrawColor(Color(34, 37, 46));
-        surface.DrawRect(0, 0, w, h);
-    end
+    self.Sidebar.Paint = function() end;
     self.BTabs = {};
     self.Draggable = false;
     self.ShowTopBar = false;
     self.TopBar = nil;
     self.TopBarSize = 40;
 
-    self:InvalidateLayout();
+    self:InvalidateChildren();
 end
 
 function PANEL:GetGUIID()
@@ -66,14 +61,14 @@ function PANEL:SetShowTopBar(show)
         end
     end
 
-    self:InvalidateLayout();
+    self:InvalidateChildren();
 end
 
 function PANEL:SetTopBarSize(size)
     local old = self.TopBarSize;
     self.TopBarSize = size;
     if old != size then
-        self:InvalidateLayout();
+        self:InvalidateChildren();
     end
 end
 
@@ -86,7 +81,7 @@ function PANEL:SetTopBarButtons(minim)
         self:SetTopBarSize(self.TopBar:GetTall());
     end
 
-    self:InvalidateLayout();
+    self:InvalidateChildren();
 end
 
 function PANEL:GetTopBar()
@@ -150,7 +145,7 @@ function PANEL:SetTabs(tabs)
         end
     end
 
-    self:InvalidateLayout();
+    self:InvalidateChildren();
 end
 
 function PANEL:RemoveTabs()
@@ -579,6 +574,9 @@ function TENTRY:Init()
     self.Entered = false;
     self.EntryChild = self.EntryChild or nil;
 
+    local posX, posY = self:LocalToScreen();
+    self:MakePopup();
+    self:SetPos(posX, posY);
     self:SpawnChildren();
 end
 
@@ -608,8 +606,10 @@ function TENTRY:OnCursorExited()
     self.Entered = false;
 end
 
-function TENTRY:Think()
-
+function TENTRY:PerformLayout(w, h)
+    if checkpanel(self.EntryChild) then
+        self.EntryChild:SetSize(w, h);
+    end
 end
 
 function TENTRY:Paint(w, h) end;
@@ -651,11 +651,13 @@ function TENTRY_CHILD:OnFocusChanged(focus)
     end
 end
 
+/*
 function TENTRY_CHILD:Paint(w, h)
     surface.SetDrawColor((self.Entered and color_con) or color_black);
     surface.DrawRect(0, 0, w, h);
     surface.SetDrawColor(color_con);
     surface.DrawOutlinedRect(0, 0, w, h);
 end
+*/
 
 vgui.Register("BTextEntry_Child", TENTRY_CHILD, "DTextEntry");

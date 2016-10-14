@@ -18,9 +18,10 @@ function MENU:Init()
 end
 
 function MENU:SpawnChildren()
-    local text = vgui.Create("BTextEntry", self);
-    text:SetPos(40, 40);
-    text:SetSize(100, 20);
+    local text = vgui.Create("BTextEntry", self.Content);
+    text:SetPos(0, 0);
+    text:SetTall(24);
+    text:StretchToParent(6, 6, 6);
 end
 
 function MENU:DoClose()
