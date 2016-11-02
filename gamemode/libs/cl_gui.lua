@@ -1,9 +1,11 @@
 local BASH = BASH;
 BASH.GUI = {};
 BASH.GUI.Name = "GUI";
-BASH.GUI.Entries = {};
-BASH.GUI.Opened = {};
-BASH.GUI.Minimized = {};
+BASH.GUI.Entries = BASH.GUI.Entries or {};
+BASH.GUI.Opened = BASH.GUI.Opened or {};
+BASH.GUI.Minimized = BASH.GUI.Minimized or {};
+BASH.GUI.NumOccupying = BASH.GUI.NumOccupying or 0;
+BASH.GUI.LastMinimized = BASH.GUI.LastMinimized or nil;
 
 function BASH.GUI:Init()
     /*
@@ -13,7 +15,8 @@ function BASH.GUI:Init()
     local gui = {
         ID = "menu_config",
         Name = "Initial Config",
-        Class = "menu_config"
+        Class = "menu_config",
+        RequiresMouse = true
     };
     self:AddEntry(gui);
 
@@ -34,6 +37,7 @@ function BASH.GUI:AddEntry(guiTab)
     guiTab.Name = guiTab.Name or "Unknown GUI";
     guiTab.Class = guiTab.Class or "BPanel";
     guiTab.AllowMultiple = guiTab.AllowMultiple or false;
+    guiTab.RequiresMouse = guiTab.RequiresMouse or false;
 
     self.Entries[guiTab.ID] = guiTab;
 end
@@ -42,36 +46,49 @@ function BASH.GUI:Open(id)
     if !self.Entries[id] then return end;
 
     local entry = self.Entries[id];
-    if self.Opened[id] and self.Opened[id]:IsValid() and !entry.AllowMultiple then return end;
-    if self.Minimized[id] and self.Minimized[id]:IsValid() then
-        local panel = self.Minimized[id];
-        panel:SetVisible(true);
-        self.Opened[id] = panel;
-        self.Minimized[id] = nil;
-        return;
-    end
+    if !entry.AllowMultiple and checkpanel(self.Opened[id]) then return end;
 
-    gui.EnableScreenClicker(true);
-    self.Opened[id] = vgui.Create(entry.Class, nil, id);
-    if !self.Opened[id] or !self.Opened[id]:IsValid() then
-        self.Opened[id] = nil;
+    if entry.RequiresMouse then
+        gui.EnableScreenClicker(true);
+        self.NumOccupying = self.NumOccupying + 1;
+    end
+    local panel = vgui.Create(entry.Class, nil, id);
+    if !checkpanel(panel) then
         MsgErr("[BASH.GUI:OpenGUI(%s)]: The GUI class for this ID doesn't exist!", id);
         return;
     end
-    self.Opened[id]:InvalidateLayout();
+    if entry.AllowMultiple then
+        self.Opened[id] = self.Opened[id] or {};
+        table.insert(self.Opened[id], panel);
+    else
+        self.Opened[id] = panel;
+    end
+    panel:InvalidateLayout();
     MsgDebug("Creating panel %s...", id);
 end
 
-function BASH.GUI:Minimize(id)
-    if !self.Entries[id] then return end;
-    if !self.Opened[id] then return end;
-    if self.Opened[id] and self.Opened[id]:IsValid() then
-        MsgDebug("Minimizing panel %s...", id);
-        local panel = self.Opened[id];
-        panel:SetVisible(false);
-        self.Opened[id] = nil;
-        self.Minimized[id] = panel;
-        return;
+function BASH.GUI:Maximize(panel)
+    if checkpanel(panel) then
+        MsgCon(color_green, false, "Maximizing panel %s...", tostring(panel));
+        panel:SetVisible(true);
+
+        local id = panel:GetGUIID();
+        if !id then return end;
+        local entry = self.Entries[id];
+        if !entry then return end;
+        if entry.AllowMultiple then
+            for index, open in pairs(self.Minimized[id]) do
+                if open == panel then
+                    self.Minimized[id][index] = nil;
+                    break;
+                end
+            end
+            self.Opened[id] = self.Opened[id] or {};
+            table.insert(self.Opened[id], panel);
+        else
+            self.Minimized[id] = nil;
+            self.Opened[id] = panel;
+        end
     end
 end
 

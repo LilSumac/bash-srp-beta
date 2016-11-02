@@ -1,3 +1,4 @@
+color_trans = Color(0, 0, 0, 0);
 color_con = Color(192, 192, 192, 255);
 color_red = Color(200, 0, 0, 255);
 color_green = Color(0, 200, 0, 255);

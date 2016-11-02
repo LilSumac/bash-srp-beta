@@ -57,15 +57,25 @@ function draw.Radial(x, y, r, ang, rot, color)
 	surface.DrawPoly(poly);
 end
 
-function draw.FadeColor(from, rate, toR, toG, toB, toA)
-	from.r = Lerp(rate, from.r, toR);
-	from.g = Lerp(rate, from.g, toG);
-	from.b = Lerp(rate, from.b, toB);
-	if toA then
-		from.a = Lerp(rate, from.a, toA);
+function draw.FadeColor(from, to, rate, doAlpha)
+	for chan, val in pairs(from) do
+		if chan == "a" and !doAlpha then continue end;
+		if val != to[chan] then
+			if math.abs(val - to[chan]) < 0.5 then
+				from[chan] = to[chan];
+			else
+				from[chan] = Lerp(rate, val, to[chan]);
+			end
+		end
 	end
 end
 
-function draw.FadeColorAlpha(from, rate, toA)
-	from.a = Lerp(rate, from.a, toA);
+function draw.FadeColorAlpha(from, to, rate)
+	if from.a != to.a then
+		if math.abs(from.a - to.a) < 0.5 then
+			from.a = to.a;
+		else
+			from.a = Lerp(rate, from.a, to.a);
+		end
+	end
 end
