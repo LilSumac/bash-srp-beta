@@ -2,7 +2,8 @@ local BASH = BASH;
 local Player = FindMetaTable("Player");
 BASH.Commands = BASH.Commands or {};
 BASH.Commands.Name = "Commands";
-BASH.Commands.Entries = BASH.Commands.sEntries or {};
+BASH.Commands.Entries = BASH.Commands.Entries or {};
+BASH.Commands.KeywordRef = BASH.Commands.KeywordRef or {};
 BASH.Commands.Dependencies = {["Ranks"] = true, ["SQL"] = SERVER};
 
 function BASH.Commands:Init()
@@ -14,7 +15,6 @@ function BASH.Commands:Init()
         Arguments = {
             {"string", "Player"}
         },
-        AccessLevel = -1,
         IsInScope = SERVER,
         Function = function(self, ply, args)
             if ply != NULL then
@@ -26,7 +26,7 @@ function BASH.Commands:Init()
                 MsgErr("[CMD.initconfig(%s)]: The config has already been initially setup!", concatArgs(ply, args));
                 return;
             end
-
+            
             if BASH.Config.SettingUp then
                 MsgErr("[CMD.initconfig(%s)]: The config is already being setup!", concatArgs(ply, args));
                 return;
@@ -54,7 +54,6 @@ function BASH.Commands:Init()
         Arguments = {
             {"string", "Player"}
         },
-        AccessLevel = -1,
         IsInScope = SERVER,
         Function = function(self, ply, args)
             if ply != NULL then
@@ -83,6 +82,36 @@ function BASH.Commands:Init()
     };
     self:AddEntry(comm);
 
+    comm = {
+        ID = "maxlast",
+        Name = "Maximize Last",
+        Desc = "Maximize the last window minimized.",
+        Keywords = {"maxlast", "lastmax"},
+        IsInScope = CLIENT,
+        Function = function(self, ply, args)
+            if !checkpanel(BASH.GUI.LastMinimized) then
+                MsgCon(color_red, false, "[CMD.maximizelast()]: No valid panel to maximize!");
+                return;
+            end
+
+            BASH.GUI:Maximize(BASH.GUI.LastMinimized);
+            BASH.GUI.LastMinimized = nil;
+        end
+    };
+    self:AddEntry(comm);
+
+    comm = {
+        ID = "shitter",
+        Name = "Shit Last",
+        Desc = "Shit the last window shitted.",
+        Keywords = {"shit"},
+        IsInScope = CLIENT,
+        Function = function(self, ply, args)
+
+        end
+    };
+    self:AddEntry(comm);
+
     hook.Call("LoadCommands", BASH);
 end
 
@@ -96,6 +125,10 @@ function BASH.Commands:AddEntry(commTab)
         MsgErr("[BASH.Commands:AddEntry(%s)]: A command with the ID '%s' already exists!", concatArgs(commTab), commTab.ID);
         return;
     end
+    if #commTab.Keywords <= 0 then
+        MsgErr("[BASH.Commands:AddEntry(%s)]: Tried adding a command with no keywords!", concatArgs(commTab));
+        return;
+    end
 
     commTab.Name = commTab.Name or "Unknown Command";
     commTab.Desc = commTab.Desc or "";
@@ -107,6 +140,9 @@ function BASH.Commands:AddEntry(commTab)
     commTab.IsInScope = commTab.IsInScope or false;
     commTab.Function = commTab.Function or function(_self, ply, args) MsgN(_self.ID .. "(): Executed") end;
 
+    for _, keyword in pairs(commTab.Keywords) do
+        self.KeywordRef[keyword] = commTab;
+    end
     self.Entries[commTab.ID] = commTab;
 end
 
@@ -115,8 +151,7 @@ function Player:CanExecute(cmd)
         cmd = BASH.Commands.Entries[cmd];
     end
     if !cmd then return false end;
-    return cmd.IsInScope and
-           (ply:GetAccessLevel() >= cmd.AccessLevel);
+    return cmd.IsInScope and (ply:GetAccessLevel() >= cmd.AccessLevel);
 end
 
 concommand.Add("bash", function(ply, cmd, args)
@@ -124,11 +159,15 @@ concommand.Add("bash", function(ply, cmd, args)
         MsgCon(color_green, false, "Valid commands:");
         for id, comm in pairs(BASH.Commands.Entries) do
             if !comm.IsInScope then continue end;
-            MsgCon(color_con, false, "\t%s", com);
+            MsgCon(color_con, false, "\t%s (%s):", comm.Name, comm.Desc);
+            for _, keyword in pairs(comm.Keywords) do
+                MsgCon(color_con, false, "\t\t%s", keyword);
+            end
         end
+        return;
     end
-    local comm = BASH.Commands.Entries[args[1]];
 
+    local comm = BASH.Commands.KeywordRef[args[1]];
     if !comm then
         MsgCon(color_red, false, "No command '%s' found!", args[1]);
     else

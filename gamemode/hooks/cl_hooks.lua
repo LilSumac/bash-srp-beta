@@ -8,6 +8,7 @@ function BASH:InitPostEntity() snow.SendToServer("BASH_PLAYER_INIT") end;
 BASH.IntroStage = BASH.IntroStage or 1;
 BASH.ConfigSet = BASH.ConfigSet or false;
 local colBG, colAnim = colBG or Color(0, 0, 0), colAnim or Color(0, 0, 0);
+local colError = Color(153, 0, 0);
 local alphaBG, alphaAnim = alphaBG or 255, alphaAnim or 0;
 local x1, x2, y1, y2 = 0, 0, 0, 0;
 //local animVal, animDir = animVal or 1, animDir or 1;
@@ -19,8 +20,8 @@ function BASH:PostRenderVGUI()
 
     if !LocalPlayer().Initialized then
         alphaAnim = Lerp(0.01, alphaAnim, 255);
-        draw.FadeColor(colBG, 0.01, 44, 62, 80);
-        draw.FadeColor(colAnim, 0.01, 255, 255, 255);
+        draw.FadeColor(colBG, color_black, 0.01);
+        draw.FadeColor(colAnim, color_white, 0.01);
     end
 
     colBG.a = alphaBG;
@@ -76,9 +77,9 @@ function BASH:PostRenderVGUI()
         animDir = 1.0035;
         if animVal >= 1.003 then
             if !self.ConfigSet then
-                draw.FadeColor(colAnim, 0.05, 153, 0, 0);
+                draw.FadeColor(colAnim, colError, 0.05);
             else
-                draw.FadeColor(colBG, 0.05, 0, 0, 0);
+                draw.FadeColor(colBG, color_black, 0.05);
                 alphaBG = Lerp(0.05, alphaBG, 0);
                 alphaAnim = Lerp(0.05, alphaAnim, 0);
             end
@@ -90,7 +91,7 @@ function BASH:PostRenderVGUI()
     */
 
     if LocalPlayer().Initialized then
-        draw.FadeColor(colBG, 0.05, 0, 0, 0);
+        draw.FadeColor(colBG, color_black, 0.05);
         alphaBG = Lerp(0.05, alphaBG, 0);
         alphaAnim = Lerp(0.05, alphaAnim, 0);
 
@@ -98,7 +99,7 @@ function BASH:PostRenderVGUI()
             self.IntroStage = 2;
         end
     elseif !self.ConfigSet then
-        draw.FadeColor(colAnim, 0.05, 255, 255, 255);
+        draw.FadeColor(colAnim, color_white, 0.05);
     end
 
     x1 = CENTER_X - (math.cos(SysTime()) * 100);
