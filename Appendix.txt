@@ -2,7 +2,7 @@
     DATA TABLE STRUCTURES
 ]]
 
-[A '*' means that the field is REQUIRED.]
+[A '*' indicates that the field is REQUIRED.]
 [The table fields are CASE-SENSITIVE. 'Name' != 'name']
 
 ____________ BASH.Cookies ____________
