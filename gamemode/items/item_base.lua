@@ -18,6 +18,8 @@ ITEM.IsStorage = false;
 ITEM.StorageSpace = {x = 0, y = 0};
 //	Override option that allows an item to store items larger than itself.
 ITEM.AllowSize = nil;
+ITEM.Lockable = true;
+ITEM.LockedByDefault = false;
 
 //	Register the base.
 BASH.Items:NewBase(ITEM);
