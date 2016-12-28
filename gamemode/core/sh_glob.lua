@@ -46,10 +46,6 @@ DATA_PLY = 1;
 DATA_CHAR = 2;
 DATA_SERVER = 3;
 
-LOG_ALL = 1;
-LOG_IC = 2;
-LOG_ERR = 3;
-
 NET_TYPE = {};
 NET_TYPE["boolean"] = "Bit";
 NET_TYPE["number"] = "Int";

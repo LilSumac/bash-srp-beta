@@ -2,7 +2,7 @@
     DATA TABLE STRUCTURES
 ]]
 
-[A '*' means that the field is REQUIRED.]
+[A '*' indicates that the field is REQUIRED.]
 [The table fields are CASE-SENSITIVE. 'Name' != 'name']
 
 ____________ BASH.Cookies ____________
@@ -22,5 +22,6 @@ Cookie Structure Table = {
     numbers.
     Max: The maximum value of the cookie. Only applicable for
     numbers.
-    Options: The options 
+    Options: The options to be displayed in the config drop-down
+    menu. Only applicable to entries using a DComboBox element.
 }
