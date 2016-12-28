@@ -1,5 +1,41 @@
 local BASH = BASH;
+local net = net;
+local math = math;
 local player = player;
+local string = string;
+
+/*
+**  'net' Library Functions
+*/
+function net.Empty(id, recip)
+    if !id or util.NetworkStringToID(id) == 0 then
+        MsgErr("[net.Empty(%s)]: The supplied ID is not a valid network string!", id or "");
+        return;
+    end
+
+    net.Start(id);
+    if CLIENT then
+        net.SendToServer();
+    else
+        if recip == true then
+            recip = player.GetAll();
+        else
+            recip = recip or {};
+        end
+        net.Send(recip);
+    end
+end
+
+/*
+**  'math' Library Functions
+*/
+function math.lerp(frac, from, to)
+    local val = Lerp(frac, from, to);
+    if (to / math.abs(val - to)) < frac then
+        val = to;
+    end
+    return val;
+end
 
 /*
 **  'player' Library Functions
@@ -23,6 +59,55 @@ function player.GetByBASHID(bashID)
 end
 
 /*
+**  'string' Library Functions
+*/
+function string.wrap(str, font, size)
+	if string.len(str) == 1 then return str, 0 end;
+    str = string.Replace(str, '\n', '');
+    str = string.Replace(str, "<br>", '\n');
+
+    surface.SetFont(font);
+	local start, c, n, lastspace, lastspacemade = 1, 1, 0, 0, 0;
+	local endstr = "";
+	while string.len(str or "") > c do
+		local sub = string.sub(str, start, c);
+
+		if str[c] == " " then
+			lastspace = c;
+		end
+
+		if surface.GetTextSize(sub) >= size and lastspace != lastspacemade then
+			local sub2;
+			if lastspace == 0 then
+				lastspace = c;
+				lastspacemade = c;
+			end
+
+			if lastspace > 1 then
+				sub2 = string.sub(str, start, lastspace - 1);
+				c = lastspace;
+			else
+				sub2 = string.sub(str, start, c);
+			end
+
+			endstr = endstr .. sub2 .. "\n";
+			lastspace = c + 1;
+			lastspacemade = lastspace;
+			start = c + 1;
+			n = n + 1;
+		end
+
+		c = c + 1;
+	end
+
+	if start < string.len(str or "") then
+		endstr = endstr .. string.sub(str or "", start);
+	end
+
+	return endstr, n;
+end
+
+/*
 **  BASH Util Functions
 */
 function MsgCon(color, log, text, ...)
@@ -37,10 +122,7 @@ end
 function MsgErr(text, ...)
     local text = Format(text, ...);
     MsgCon(color_red, true, text);
-
-	local date = os.date("%Y-%m-%d", os.time());
-	local time = os.date("%X", os.time());
-	BASH:WriteToFile(Format("bash/errors/%s.txt", date), Format("[%s]: %s", time, text));
+    BASH:WriteToLog(text, LOG_ERR);
 end
 
 function MsgDebug(text, ...)
@@ -260,12 +342,34 @@ end
 function BASH:WriteToLog(text, logType)
 	if !self:LoggingEnabled() then return end;
 
+    local file = self:GetLoggingFile(logType);
 	local time = os.date("%X");
-	self:WriteToFile(self:GetLoggingFile(logType), "[" .. time .. "]: " .. text);
+    file:Write(Format("[%s] %s\n", time, text));
+    file:Flush();
 end
 
 function BASH:GetLoggingFile(logType)
-	return "bash/logs/" .. ((logType == LOG_ALL and "all/") or "ic/") .. os.date("%Y-%m-%d", os.time());
+    local fileDir = (logType == LOG_ALL and "all/") or (logType == LOG_IC and "ic/") or (logType == LOG_ERR and "error/") or "misc/";
+    local tabPre = (logType == LOG_ALL and "Log") or (logType == LOG_IC and "IC") or (logType == LOG_ERR and "Error") or "Misc";
+    local fileName = "bash/logs/" .. fileDir .. os.date("%Y-%m-%d", os.time()) .. ".txt";
+    local tabFile = tabPre .. "File";
+    local tabFileName = tabFile .. "Name";
+
+    if !file.Exists("bash/logs/" .. fileDir, "DATA") then
+        file.CreateDir("bash/logs/" .. fileDir);
+    end
+
+    if !self[tabFile] then
+        MsgN("Opening initial " .. tabFile .. "...");
+        self[tabFile] = file.Open(fileName, "a", "DATA");
+        self[tabFileName] = fileName;
+    elseif self[tabFileName] != fileName then
+        MsgN("Swapping over to next day's " .. tabFile .. ".");
+        self[tabFile]:Close();
+        self[tabFile] = file.Open(fileName, "a", "DATA");
+        self[tabFileName] = fileName;
+    end
+    return self[tabFile];
 end
 
 function BASH:LoggingEnabled()

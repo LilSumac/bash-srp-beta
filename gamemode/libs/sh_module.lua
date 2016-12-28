@@ -30,8 +30,7 @@ function BASH.Modules:Load(modID, modPath, isSingleFile)
     end
 
     if !file.Exists((isSingleFile and modPath) or modPath .. "/sh_module.lua", "LUA") then
-        local args = concatArgs(modID, modPath, isSingleFile);
-        MsgErr("[BASH.Modules:Load(%s)]: This module has no base file!", args);
+        MsgErr("[BASH.Modules:Load(%s)]: This module has no base file!", modID);
         return;
     end
     BASH:IncludeFile((isSingleFile and modPath) or modPath .. "/sh_module.lua");

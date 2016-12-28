@@ -9,6 +9,104 @@ function Panel:GetParentOfType(type)
     end
 end
 
+function Panel:AlignTo(target, alignType, margin)
+    if !target then return end;
+    if !alignType then return end;
+
+    if isstring(target) then
+        local parent = self:GetParentOfType("BPanel");
+        if !checkpanel(parent) then return end;
+        target = parent:GetContentByID(target);
+        if !target then return end;
+    elseif !target:IsValid() then return end;
+
+    margin = margin or 0;
+    local newX, newY = self:GetPos();
+    local _w, _h = self:GetSize();
+    local x, y = target:GetPos();
+    local w, h = target:GetSize();
+    //  NICE SWITCH STATEMENT IDIOT.
+    if alignType == ALIGN_ABOVE then
+        newY = y - _h - margin;
+    elseif alignType == ALIGN_ABOVELEFT then
+        newX = x;
+        newY = y - _h - margin;
+    elseif alignType == ALIGN_ABOVECENT then
+        newX = (x + (w / 2)) - (_w / 2);
+        newY = y - _h - margin;
+    elseif alignType == ALIGN_ABOVERIGHT then
+        newX = (x + w) - _w;
+        newY = y - _h - margin;
+    elseif alignType == ALIGN_BELOW then
+        newY = y + h + margin;
+    elseif alignType == ALIGN_BELOWLEFT then
+        newX = x;
+        newY = y + h + margin;
+    elseif alignType == ALIGN_BELOWCENT then
+        newX = (x + (w / 2)) - (_w / 2);
+        newY = y + h + margin;
+    elseif alignType == ALIGN_BELOWRIGHT then
+        newX = (x + w) - _w;
+        newY = y + h + margin;
+    elseif alignType == ALIGN_LEFT then
+        newX = x - _w - margin;
+    elseif alignType == ALIGN_LEFTTOP then
+        newX = x - _w - margin;
+        newY = y;
+    elseif alignType == ALIGN_LEFTCENT then
+        newX = x - _w - margin;
+        newY = (y + (h / 2)) - (_h / 2);
+    elseif alignType == ALIGN_LEFTBOT then
+        newX = x - _w - margin;
+        newY = (y + h) - _h;
+    elseif alignType == ALIGN_RIGHT then
+        newX = x + w + margin;
+    elseif alignType == ALIGN_RIGHTTOP then
+        newX = x + w + margin;
+        newY = y;
+    elseif alignType == ALIGN_RIGHTCENT then
+        newX = x + w + margin;
+        newY = (y + (h / 2)) - (_h / 2);
+    elseif alignType == ALIGN_RIGHTBOT then
+        newX = x + w + margin;
+        newY = (y + h) - _h;
+    end
+
+    self:SetPos(newX, newY);
+    target.AlignedChildren = target.AlignedChildren or {};
+    target.AlignedChildren[self] = {alignType, margin};
+
+    if !target.LayoutFuncChanged then
+        local oldFunc = target.PerformLayout;
+        target.OldPerformLayout = oldFunc;
+        function target:PerformLayout(oldW, oldH)
+            if self.OldPerformLayout then
+                self:OldPerformLayout(oldW, oldH);
+            end
+
+            if !self.AlignedChildren then return end;
+            for panel, tab in pairs(self.AlignedChildren) do
+                panel:AlignTo(self, tab[1], tab[2]);
+            end
+        end
+        target.LayoutFuncChanged = true;
+    end
+end
+
+function Panel:RemoveAlign(target)
+    if !target or !target.AlignedChildren then return end;
+    target.AlignedChildren[self] = nil;
+end
+
+function Panel:IsVisibleByDefault()
+    if self.VisibleByDefault == nil then return true end;
+    return self.VisibleByDefault;
+end
+
+function Panel:SetVisibleByDefault(vis)
+    self.VisibleByDefault = vis;
+end
+
 /*
 **  Base Panel
 */
@@ -104,7 +202,7 @@ function PANEL:SetTabs(tabs)
             tab.Type = tab.Type or TAB_TEXT;
             tab.Font = tab.Font or "CenterPrintText";
             tab.Text = tab.Text or "Tab";
-            tab.Icon = tab.Icon or TEXTURE_ERROR;
+            tab.Icon = tab.Icon or "ok";
 
             if tab.Type == TAB_TEXT or tab.Type == TAB_BOTH then
                 surface.SetFont(tab.Font);
@@ -190,8 +288,8 @@ function PANEL:DoClose(minim)
     else
         self:Remove();
     end
-    if self.PostDoClose then
-        self:PostDoClose(minim);
+    if self.AfterClose then
+        self:AfterClose(minim);
     end
 end
 
@@ -199,6 +297,7 @@ function PANEL:CheckSidebar()
     if !checkpanel(self.SidebarWrapper) then
         self.SidebarWrapper = vgui.Create("BScroll", self);
         self.SidebarWrapper:SetBGColor(Color(65, 78, 97));
+        self.SidebarWrapper:RoundCorners(8, false, false, true);
         self.SidebarWrapper.VBar:SetWide(0);
     end
     if !checkpanel(self.Sidebar) then
@@ -220,7 +319,7 @@ function PANEL:CheckContent()
     end
 end
 
-function PANEL:AddContent(class, tabNum)
+function PANEL:AddContent(class, tabNum, childID)
     local element = vgui.Create(class, self.Content);
     if !checkpanel(element) then
         MsgErr("[PANEL:AddContent(%s, %d)]: No VGUI class named '%s'!", class);
@@ -228,7 +327,16 @@ function PANEL:AddContent(class, tabNum)
 
     element:SetVisible(tabNum == self.SelectedTab);
     element.TabIndex = element.TabIndex or tabNum or 0;
+    if childID then
+        self.Content.ChildrenIDs = self.Content.ChildrenIDs or {};
+        self.Content.ChildrenIDs[childID] = element;
+    end
     return element;
+end
+
+function PANEL:GetContentByID(id)
+    self.Content.ChildrenIDs = self.Content.ChildrenIDs or {};
+    return self.Content.ChildrenIDs[id] or false;
 end
 
 function PANEL:OnChildAdded(child)
@@ -285,6 +393,7 @@ function PANEL:PerformLayout(w, h)
 
     local tallest, y, curSize = 0, 0, 0;
     for _, child in pairs(self.Content:GetChildren()) do
+        if !child:IsVisible() then continue end;
         _, y = child:GetPos();
         curSize = child:GetTall() + y;
         if curSize > tallest then
@@ -293,20 +402,10 @@ function PANEL:PerformLayout(w, h)
     end
     self.Content:SetVisible(true);
     self.Content:SetPos(0, 0);
-    self.Content:SetSize(self.ContentWrapper:GetWide() - 24, tallest);
+    self.Content:SetSize(self.ContentWrapper:GetWide() - self.ContentWrapper.VBar:GetWide(), tallest + 6);
 end
 
-function PANEL:Paint(w, h)
-    /*
-    if self.ShowTopBar then
-        surface.SetDrawColor(Color(43, 54, 72));
-        surface.DrawRect(0, self.TopBarSize, w, h - self.TopBarSize);
-    else
-        surface.SetDrawColor(Color(43, 54, 72));
-        surface.DrawRect(0, 0, w, h);
-    end
-    */
-end
+function PANEL:Paint() end;
 
 vgui.Register("BPanel", PANEL, "EditablePanel");
 
@@ -505,7 +604,6 @@ end
 function MINIM:DoClick()
     local parent = self:GetParentOfType("BPanel");
     if checkpanel(parent) then
-        MsgN(parent);
         parent:DoClose(true);
     end
 end
@@ -574,10 +672,11 @@ function TAB:Init()
     self.Selected = false;
     self.HoverColor = Color(28, 29, 34, 0);
     self.Entered = false;
+    self.EnteredFlag = 0;
     self.Callback = nil;
     self.Type = TAB_TEXT;
     self.Text = "";
-    self.Icon = TEXTURE_ERROR;
+    self.Icon = {};
     self:SetText("");
 end
 
@@ -593,8 +692,13 @@ function TAB:SetBText(text)
     self.Text = text;
 end
 
-function TAB:SetBIcon(icon)
-    self.Icon = icon;
+function TAB:SetBIcon(iconID)
+    if !ICONS[iconID] then
+        MsgErr("[TAB:SetBIcon(%s)]: No icon found with that ID!", iconID);
+        return;
+    end
+
+    self.Icon = ICONS[iconID];
 end
 
 function TAB:SetSelected(selected)
@@ -621,7 +725,7 @@ function TAB:DoClick()
         if checkpanel(parent.Content) then
             for _, panel in pairs(parent.Content:GetChildren()) do
                 if checkpanel(panel) then
-                    panel:SetVisible(panel.TabIndex == index);
+                    panel:SetVisible(panel.TabIndex == index and panel:IsVisibleByDefault());
                 end
             end
         end
@@ -637,13 +741,26 @@ function TAB:DoClick()
             self.Callback();
         end
     end
+
+
+    parent:InvalidateLayout();
 end
 
 function TAB:Think()
     if (self.Entered or self.Selected) and self.HoverColor.a != 255 then
         draw.FadeColorAlpha(self.HoverColor, color_black, 0.05);
+
+        local w = self:GetWide();
+        local flagSize = math.Round(w * 0.05);
+        if self.Selected and self.EnteredFlag != flagSize then
+            self.EnteredFlag = math.lerp(0.05, self.EnteredFlag, flagSize);
+        end
     elseif !(self.Entered or self.Selected) and self.HoverColor.a != 0 then
         draw.FadeColorAlpha(self.HoverColor, color_trans, 0.05);
+
+        if !self.Selected and self.EnteredFlag != 0 then
+            self.EnteredFlag = math.lerp(0.05, self.EnteredFlag, 0);
+        end
     end
 end
 
@@ -652,18 +769,18 @@ function TAB:Paint(w, h)
         surface.SetDrawColor(self.HoverColor);
         surface.DrawRect(0, 0, w, h);
         if self.Selected then
-            surface.SetDrawColor(Color(34, 125, 170));
-            surface.DrawRect(0, 0, w * 0.05, h);
+            surface.SetDrawColor(60, 139, 63);
+            surface.DrawRect(0, 0, self.EnteredFlag, h);
         end
     end
 
     local x = h * 0.125;
     if self.Type != TAB_TEXT then
-        local size = h * 0.75;
-        surface.SetDrawColor(color_white);
-        surface.SetMaterial(self.Icon);
-        surface.DrawTexturedRect(x, h * 0.125, size, size);
-        x = x + size + (h * 0.125);
+        if self.Icon.Font and self.Icon.Value then
+            local size = h * 0.75;
+            draw.SimpleText(string.char(self.Icon.Value), "bash-icons-" .. self.Icon.Font, x + (size / 2), x + (size / 2), Color(200, 200, 200), TEXT_CENT, TEXT_CENT);
+            x = x + size + (h * 0.125);
+        end
     end
 
     if self.Type != TAB_ICON then
@@ -686,18 +803,33 @@ local SCROLL = {};
 function SCROLL:Init()
     self.ScrollingSet = false;
     self.BGColor = color_black;
+    self.CornerRadius = 0;
+    self.Corners = {};
 
-    self.VBar:SetWide(8);
+    self:SetBarWide(10);
     self.VBar.Paint = function() end;
     self.VBar.btnUp.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, Color(0, 0, 0, 100));
+        surface.SetDrawColor(200, 200, 200);
+        surface.DrawRect(1, 1, w - 2, h - 2);
+        surface.SetDrawColor(53, 64, 82);
+        surface.DrawOutlinedRect(1, 1, w - 2, h - 2);
     end
     self.VBar.btnDown.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, Color(0, 0, 0, 100));
+        surface.SetDrawColor(200, 200, 200);
+        surface.DrawRect(1, 1, w - 2, h - 2);
+        surface.SetDrawColor(53, 64, 82);
+        surface.DrawOutlinedRect(1, 1, w - 2, h - 2);
     end
     self.VBar.btnGrip.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, Color(0, 0, 0, 100));
+        surface.SetDrawColor(200, 200, 200);
+        surface.DrawRect(1, 1, w - 2, h - 2);
+        surface.SetDrawColor(53, 64, 82);
+        surface.DrawOutlinedRect(1, 1, w - 2, h - 2);
     end
+end
+
+function SCROLL:SetBarWide(wide)
+    self.VBar:SetWide(wide);
 end
 
 function SCROLL:SetBGColor(color)
@@ -708,16 +840,26 @@ function SCROLL:OnVScroll(offset)
     local canvas = self:GetCanvas();
     if checkpanel(canvas) then
         if !self.ScrollingSet and BASH.Cookies:Get("smooth_dragging") then
-            canvas:LerpPositions(7, false);
+            canvas:LerpPositions(10, false);
             self.ScrollingSet = true;
         end
         canvas:SetPos(0, offset);
     end
 end
 
+function SCROLL:RoundCorners(rad, ...)
+    self.CornerRadius = rad or 0;
+    local args = {...};
+    if !args then self.Corners = {} return end;
+    for index, round in pairs(args) do
+        self.Corners[index] = (round == true);
+    end
+end
+
 local arrowCol, points = Color(20, 20, 20), nil;
 function SCROLL:Paint(w, h)
-    draw.RoundedBox(0, 0, 0, w, h, self.BGColor);
+    local c = self.Corners;
+    draw.RoundedBoxEx(self.CornerRadius, 0, 0, w, h, self.BGColor, c[1], c[2], c[3], c[4]);
 end
 
 vgui.Register("BScroll", SCROLL, "DScrollPanel");
@@ -743,6 +885,18 @@ function TENTRY:SpawnChildren()
         self.EntryChild = vgui.Create("BTextEntry_Child", self);
         self.EntryChild:SetPos(0, 0);
         self.EntryChild:SetSize(w, h);
+    end
+end
+
+function TENTRY:SetText(text)
+    if checkpanel(self.EntryChild) then
+        self.EntryChild:SetText(text);
+    end
+end
+
+function TENTRY:GetValue()
+    if checkpanel(self.EntryChild) then
+        return self.EntryChild:GetValue();
     end
 end
 
@@ -801,13 +955,53 @@ function TENTRY_CHILD:OnFocusChanged(focus)
     end
 end
 
-/*
-function TENTRY_CHILD:Paint(w, h)
-    surface.SetDrawColor((self.Entered and color_con) or (self:HasFocus() and color_red) or color_black);
-    surface.DrawRect(0, 0, w, h);
-    surface.SetDrawColor(color_con);
-    surface.DrawOutlinedRect(0, 0, w, h);
-end
-*/
-
 vgui.Register("BTextEntry_Child", TENTRY_CHILD, "DTextEntry");
+
+/*
+**  Long Text Label
+*/
+local LONG_TEXT = {};
+
+function LONG_TEXT:Init()
+    self.LongText = "";
+    self.TextCol = color_white;
+    self.Font = "CenterPrintText";
+end
+
+function LONG_TEXT:SetText(text, width)
+    self.LongText = string.wrap(text, self.Font, width or 10000);
+    self:SizeToContents();
+end
+
+function LONG_TEXT:GetText()
+    return self.LongText;
+end
+
+function LONG_TEXT:SetTextColor(col)
+    self.TextCol = col;
+end
+
+function LONG_TEXT:GetTextColor()
+    return self.TextCol;
+end
+
+function LONG_TEXT:SetFont(font)
+    self.Font = font;
+    self:SizeToContents();
+end
+
+function LONG_TEXT:GetFont()
+    return self.Font;
+end
+
+function LONG_TEXT:SizeToContents()
+    surface.SetFont(self.Font);
+    local x, y = surface.GetTextSize(self.LongText);
+    self:SetSize(x, y);
+end
+
+function LONG_TEXT:Paint(w, h)
+    draw.DrawText(self.LongText, self.Font, 0, 0, self.TextCol);
+end
+
+vgui.Register("BLongText", LONG_TEXT, "Panel");

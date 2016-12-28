@@ -9,7 +9,6 @@ function BASH.Ranks:Init()
     /*
     **  Create Default Ranks
     */
-
     local rank = {
         ID = "owner",
         Name = "Owner",
@@ -87,6 +86,7 @@ function BASH.Ranks:GetStaff()
 end
 
 function Player:GetAccessLevel()
+    if !self:GetRank() then return -1 end;
 	return BASH.Ranks.Entries[self:GetRank()].AccessLevel;
 end
 

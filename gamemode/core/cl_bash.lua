@@ -1,5 +1,16 @@
 local BASH = BASH;
 
+function BASH:Initialize()
+	surface.CreateFont("bash-icons-1", {
+		font = "bash-icons-1",
+		size = 16
+	});
+	surface.CreateFont("bash-icons-2", {
+		font = "bash-icons-2",
+		size = 16
+	});
+end
+
 function BASH:Init()
 	if self.Initialized then return end;
 

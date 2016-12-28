@@ -3,7 +3,9 @@ local BASH = BASH;
 /*
 **  GMod Hooks
 */
-function BASH:InitPostEntity() snow.SendToServer("BASH_PLAYER_INIT") end;
+function BASH:InitPostEntity()
+    net.Empty("BASH_PLAYER_INIT");
+end
 
 BASH.IntroStage = BASH.IntroStage or 1;
 BASH.ConfigSet = BASH.ConfigSet or false;

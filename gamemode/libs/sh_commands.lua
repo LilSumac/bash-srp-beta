@@ -26,7 +26,7 @@ function BASH.Commands:Init()
                 MsgErr("[CMD.initconfig(%s)]: The config has already been initially setup!", concatArgs(ply, args));
                 return;
             end
-            
+
             if BASH.Config.SettingUp then
                 MsgErr("[CMD.initconfig(%s)]: The config is already being setup!", concatArgs(ply, args));
                 return;
@@ -40,7 +40,8 @@ function BASH.Commands:Init()
 
             target.SettingConfig = true;
             BASH.Config.SettingUp = true;
-            snow.Send(target, "BASH_CONFIG_INIT");
+            net.Empty("BASH_CONFIG_INIT", target);
+
             MsgCon(color_green, true, "Commencing config initialization on player %s [%s].", target:Name(), target:SteamID());
         end
     };
@@ -52,7 +53,7 @@ function BASH.Commands:Init()
         Desc = "Add a player to the \'owner\' rank through the server console.",
         Keywords = {"setowner"},
         Arguments = {
-            {"string", "Player"}
+            {"string", "Player/Character"}
         },
         IsInScope = SERVER,
         Function = function(self, ply, args)
@@ -135,7 +136,7 @@ function BASH.Commands:AddEntry(commTab)
     commTab.Keywords = commTab.Keywords or {};
     commTab.Arguments = commTab.Arguments or {};
     commTab.Prefix = commTab.Prefix or '/';
-    commTab.AccessLevel = commTab.AccessLevel or -1;
+    commTab.AccessLevel = commTab.AccessLevel or 0;
     commTab.AccessFlag = commTab.AccessFlag or "";
     commTab.IsInScope = commTab.IsInScope or false;
     commTab.Function = commTab.Function or function(_self, ply, args) MsgN(_self.ID .. "(): Executed") end;
@@ -157,11 +158,20 @@ end
 concommand.Add("bash", function(ply, cmd, args)
     if !args[1] then
         MsgCon(color_green, false, "Valid commands:");
-        for id, comm in pairs(BASH.Commands.Entries) do
+        for id, comm in SortedPairs(BASH.Commands.Entries) do
             if !comm.IsInScope then continue end;
-            MsgCon(color_con, false, "\t%s (%s):", comm.Name, comm.Desc);
+            MsgCon(color_green, false, "\t%s (%s):", comm.Name, comm.Desc);
+            MsgCon(color_white, false, "\t\tKeywords:");
             for _, keyword in pairs(comm.Keywords) do
-                MsgCon(color_con, false, "\t\t%s", keyword);
+                MsgCon(color_con, false, "\t\t\t%s", keyword);
+            end
+            MsgCon(color_white, false, "\t\tArguments:");
+            if #comm.Arguments > 0 then
+                for _, argTab in ipairs(comm.Arguments) do
+                    MsgCon(color_con, false, "\t\t\t%s (%s)", argTab[2], argTab[1]);
+                end
+            else
+                MsgCon(color_con, false, "\t\t\tNone.");
             end
         end
         return;
@@ -176,21 +186,19 @@ concommand.Add("bash", function(ply, cmd, args)
             return;
         end
         if ply != NULL then
-            /*
             if ply:GetAccessLevel() < comm.AccessLevel then
-                MsgCon(color_red, false, "You're not allowed to do that with your current access level! (%d -> %d)", ply:GetAccessLevel(), comm.AccessLevel);
+                MsgCon(color_red, false, "You're not allowed to do that with your current access level! (%d < %d)", ply:GetAccessLevel(), comm.AccessLevel);
                 return;
             elseif comm.AccessFlag != "" && !ply:HasFlag(comm.AccessFlag) then
                 MsgCon(color_red, false, "You're not allowed to do that with your current flags! (Needed: %s)", comm.AccessFlag);
                 return;
             end
-            */
         end
 
         table.remove(args, 1);
         local commType, commDesc;
         local isOptional = false;
-        for index, commArg in pairs(comm.Arguments) do
+        for index, commArg in ipairs(comm.Arguments) do
             commType = commArg[1];
             commDesc = commArg[2];
             if string.EndsWith(commType, '*') then
@@ -212,22 +220,58 @@ concommand.Add("bash", function(ply, cmd, args)
     end
 end,
 function(cmd, args)
-    args = string.Trim(args);
-    args = string.lower(args);
-    local tab = string.Explode(" ", args);
-    local results = {};
-    local curLine, curArg;
+    args = string.Trim(string.lower(args));
+    local tab = {};
+    local curChar, wrappingString, wrapStart = '', false, 1;
+    for index = 1, string.len(args) do
+        curChar = string.GetChar(args, index);
+        if curChar == ' ' and !wrappingString then
+            table.insert(tab, string.sub(args, wrapStart, index - 1));
+            wrapStart = index + 1;
+        elseif curChar == '\"' and index + 1 <= string.len(args) then
+            wrappingString = !wrappingString;
+        elseif index + 1 > string.len(args) then
+            table.insert(tab, string.sub(args, wrapStart, index));
+            break;
+        end
+    end
 
-    if tab[1] and tab[1] != "" then
+    local results = {};
+    local curLine;
+    if #tab <= 1 then
         for id, comm in pairs(BASH.Commands.Entries) do
+            if !comm.IsInScope then continue end;
             for _, keyword in pairs(comm.Keywords) do
                 curLine = "bash ";
-                if string.sub(keyword, 1, string.len(tab[1])) then
-                    curLine = curLine .. keyword;
-                    table.insert(results, curLine);
-                    break;
+                if !tab[1] or tab[1] == string.sub(keyword, 1, string.len(tab[1])) then
+                    curLine = curLine .. keyword .. " ";
+                    if #comm.Arguments > 0 then
+                        for index, argTab in ipairs(comm.Arguments) do
+                            if argTab[1] == "string" then
+                                curLine = curLine .. "\"" .. argTab[2] .. "\" ";
+                            else
+                                curLine = curLine .. argTab[2] .. " ";
+                            end
+                        end
+                    end
+                    table.insert(results, string.Trim(curLine));
                 end
             end
+        end
+    elseif #tab > 1 then
+        local comm = BASH.Commands.KeywordRef[tab[1]];
+        if comm then
+            curLine = "bash " .. tab[1] .. " ";
+            if #comm.Arguments > 0 then
+                for index, argTab in ipairs(comm.Arguments) do
+                    if argTab[1] == "string" then
+                        curLine = curLine .. "\"" .. argTab[2] .. "\" ";
+                    else
+                        curLine = curLine .. argTab[2] .. " ";
+                    end
+                end
+            end
+            table.insert(results, string.Trim(curLine));
         end
     end
 

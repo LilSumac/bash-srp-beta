@@ -1,9 +1,11 @@
 local BASH = BASH;
 BASH.Registry = {};
 BASH.Registry.Name = "Registry";
-BASH.Registry.Vars = {};
-BASH.Registry.Players = {};
-BASH.Registry.Queue = {};
+BASH.Registry.Vars = BASH.Registry.Vars or {};
+BASH.Registry.Players = BASH.Registry.Players or {};
+BASH.Registry.Queue = BASH.Registry.Queue or nil;
+BASH.Registry.VarBuffer = BASH.Registry.VarBuffer or {};
+BASH.Registry.LastVarUpdate = BASH.Registry.LastVarUpdate or 0;
 BASH.Registry.Dependencies = {["SQL"] = SERVER};
 local Player = FindMetaTable("Player");
 
@@ -59,52 +61,39 @@ function BASH.Registry:NewVariable(name, type, default, public, sqlTable)
     self.Vars[name].SQLTable = sqlTable;
 
     Player["Get" .. name] = function(_self)
+        if !checkply(_self) then return end;
         if !self.Players[_self:SteamID()] then
-            MsgErr("[Player:Get%s()]: Player not registered! (%s/%s)", name, _self:Nick(), _self:SteamID());
+            MsgErr("[Player:Get%s()]: %s not registered! (%s)", name, (CLIENT and "You're") or _self:Nick(), _self:SteamID());
             return;
         end
 
         return self.Players[_self:SteamID()][name];
     end
 
-    if CLIENT then
-        net.Receive("BASH_UPDATE_VAR", function(len)
-            local varName = net.ReadString();
-            local var = self.Vars[varName];
-            local steamID = net.ReadString();
-            local val = net["Read" .. NET_TYPE[var.Type]](32);
-            val = detype(val, var.Type);
-
-            if !self.Players[steamID] then
-                self.Players[steamID] = {};
-            end
-
-            self.Players[steamID][name] = val;
-        end);
-    elseif SERVER then
+    if SERVER then
         Player["Set" .. name] = function(_self, val)
-            local steamID = _self:SteamID();
+            if !checkply(_self) then return end;
 
+            local steamID = _self:SteamID();
             if !self.Players[steamID] then
-                MsgErr("[Player:Set%s(%s)]: Player not registered! (%s/%s)", name, detype(val, "string"), _self:Nick(), steamID);
+                MsgErr("[Player:Set%s(...)]: Player not registered! (%s/%s)", name, _self:Nick(), steamID);
                 return;
             end
 
-            self.Players[steamID][name] = val;
-
             local var = self.Vars[name];
             val = detype(val, var.Type);
-            net.Start("BASH_UPDATE_VAR");
-                net.WriteString(name);
-                net.WriteString(steamID);
-                net["Write" .. NET_TYPE[var.Type]](val, 32);
+
+            self.Players[steamID][name] = val;
 
             if var.Public then
-                net.Broadcast();
+                self.VarBuffer = self.VarBuffer or {};
+                self.VarBuffer[steamID] = self.VarBuffer[steamID] or {};
+                self.VarBuffer[steamID][name] = val;
+                self.LastVarUpdate = SysTime();
             else
-                local recipients = BASH.Ranks:GetStaff();
-                table.Add(recipients, {_self});
-                net.Send(recipients);
+                _self.VarBuffer = _self.VarBuffer or {};
+                _self.VarBuffer[name] = val;
+                _self.LastVarUpdate = SysTime();
             end
         end
 
@@ -121,8 +110,73 @@ function BASH.Registry:NewVariable(name, type, default, public, sqlTable)
     end
 end
 
+function Player:GetVars(vars)
+    if !vars or #vars == 0 then return end;
+
+    local vals = {};
+    for index, var in ipairs(vars) do
+        vals[index] = self["Get" .. var](self);
+    end
+
+    return unpack(vals);
+end
+
+function Player:SetVars(vars, vals)
+    if !vars or #vars == 0 then return end;
+    vals = vals or {};
+
+    for index, var in ipairs(vars) do
+        self["Set" .. var](self, vals[index]);
+    end
+end
+
 if SERVER then
-    function Player:Register(data)
+    hook.Add("Think", "BASH_HandleVarUpdateQueue", function()
+        BASH.Registry.VarBuffer = BASH.Registry.VarBuffer or {};
+        BASH.Registry.LastVarUpdate = BASH.Registry.LastVarUpdate or 0;
+        if table.Count(BASH.Registry.VarBuffer) > 0 and SysTime() - BASH.Registry.LastVarUpdate > 0.5 then
+            local ply, removeTab = nil, {};
+            for steamID, varTab in pairs(BASH.Registry.VarBuffer) do
+                ply = player.GetBySteamID(steamID);
+                if !checkply(ply) then
+                    removeTab[steamID] = true;
+                end
+            end
+            for steamID, _ in pairs(removeTab) do
+                BASH.Registry.VarBuffer[steamID] = nil;
+            end
+
+            local broadcastPacket = vnet.CreatePacket("BASH_UPDATE_VAR");
+            broadcastPacket:Table(BASH.Registry.VarBuffer);
+            broadcastPacket:AddTargets(player.GetAll());
+            broadcastPacket:Send();
+            BASH.Registry.VarBuffer = {};
+        end
+
+        local steamID, curTab, curPacket;
+        for _, ply in pairs(player.GetAll()) do
+            if !ply.VarBuffer or table.Count(ply.VarBuffer) == 0 then continue end;
+
+            ply.LastVarUpdate = ply.LastVarUpdate or 0;
+            if SysTime() - ply.LastVarUpdate < 0.5 then continue end;
+
+            steamID = ply:SteamID();
+            curTab = {};
+            curTab[steamID] = {};
+            for var, val in pairs(ply.VarBuffer) do
+                curTab[steamID][var] = val;
+            end
+
+            if table.Count(curTab[steamID]) > 0 then
+                curPacket = vnet.CreatePacket("BASH_UPDATE_VAR");
+                curPacket:Table(curTab);
+                curPacket:AddTargets(ply);
+                curPacket:Send();
+            end
+        end
+    end);
+
+    function Player:Register(data, queued)
         if !checkply(self) then return end;
         if !BASH.Registry.Vars then return end;
 
@@ -135,45 +189,56 @@ if SERVER then
     	end
 
         if !BASH.Registry.Queue then
-            BASH.Registry.Queue = {};
+            BASH.Registry.Queue = Queue:Create();
         end
-    	if BASH.Registry.Queue[1] and BASH.Registry.Queue[1] != steamID then
-    		local index = #BASH.Registry.Queue + 1;
-    		BASH.Registry.Queue[index] = steamID;
-    		snow.Send(ply, "BASH_REGISTRY_QUEUED", index);
-    		self.SQLData = data;
 
+        BASH.Registry.Queue:print();
+        local nextPos = BASH.Registry.Queue:first();
+    	if nextPos and nextPos != steamID then
+            local index = BASH.Registry.Queue:enqueue(steamID);
+            net.Start("BASH_REGISTRY_QUEUED");
+                net.WriteInt(index, 8);
+            net.Send(self);
+
+    		self.SQLData = data;
     		return;
-    	elseif !BASH.Registry.Queue[1] then
-    		BASH.Registry.Queue[1] = steamID;
-    	end
+    	elseif !nextPos then
+            BASH.Registry.Queue:enqueue(steamID);
+        end
 
     	self.SQLData = data;
     	self:PushData();
     	self:PullData();
 
-    	snow.Send(self, "BASH_PLAYER_LOADED");
+        net.Empty("BASH_PLAYER_LOADED", self);
+
     	self.Registered = true;
     	BASH.LastRegistered = steamID;
     end
     hook.Add("Think", "BASH_HandleRegistryQueue", function()
         if !BASH.Registry.Queue then
-            BASH.Registry.Queue = {};
+            BASH.Registry.Queue = Queue:Create();
         end
+        if !BASH.Registry.Queue:first() then return end;
+        if BASH.LastRegistered == BASH.Registry.Queue:first() then
+            //  Get rid of the finished player.
+            BASH.Registry.Queue:dequeue();
 
-    	if BASH.LastRegistered == BASH.Registry.Queue[1] then
-            table.Remove(BASH.Registry.Queue, 1);
-
-    		local ply = player.GetBySteamID(BASH.Registry.Queue[1]);
+            local nextID = BASH.Registry.Queue:dequeue();
+    		local ply = player.GetBySteamID(nextID);
     		if CheckPly(ply) and ply.SQLData then
     			ply:Register(ply.SQLData);
     		end
 
-    		if #BASH.Registry.Queue > 1 then
-    			for index = 2, #BASH.Registry.Queue do
-    				local ply = player.GetBySteamID(BASH.Registry.Queue[index]);
+    		if BASH.Registry.Queue:len() > 1 then
+    			for index, id in pairs(BASH.Registry.Queue:elem()) do
+                    if index == 1 then continue end;
+    				local ply = player.GetBySteamID(id);
     				if CheckPly(ply) then
-                        snow.Send(ply, "BASH_REGISTRY_QUEUED", index);
+                        local queuePacket = vnet.CreatePacket("BASH_REGISTRY_QUEUED");
+                        queuePacket:Byte(index);
+                        queuePacket:AddTargets(ply);
+                        queuePacket:Send();
     				end
     			end
     		end
@@ -197,26 +262,31 @@ if SERVER then
     function Player:PullData()
     	MsgCon(color_green, false, "[PULL] %s", self:Name());
 
+        local pullTab = {};
     	local steamID, varTable;
     	for _, ply in pairs(player.GetAll()) do
     		if self != ply and ply.Registered then
     			steamID = ply:SteamID();
     			if !BASH.Players[steamID] then continue end;
 
+                pullTab[steamID] = {};
     			for var, val in pairs(BASH.Players[steamID]) do
     				varTable = BASH.Registry.Vars[var];
     				if !varTable then continue end;
 
     				if varTable.Public or self:IsStaff() then
-    					net.Start("BASH_UPDATE_VAR");
-    						net.WriteString(name);
-    						net.WriteString(steamID);
-    						net["Write" .. NET_TYPE[varTable.Type]](val, 32);
-    					net.Send(self);
+                        pullTab[steamID][var] = val;
     				end
     			end
     		end
     	end
+
+        if table.Count(pullTab) > 0 then
+            local packet = vnet.CreatePacket("BASH_UPDATE_VAR");
+            packet:Table(pullTab);
+            packet:AddTargets(self);
+            packet:Send();
+        end
     end
 end
 
@@ -229,12 +299,24 @@ if CLIENT then
         BASH.IntroStage = 2;
     end);
 
-    net.Receive("BASH_REGISTRY_PROGRESS", function(len)
-        LocalPlayer().RegistryProgress = net.ReadInt(32);
+    /*
+    vnet.Watch("BASH_REGISTRY_PROGRESS", function(data)
+        LocalPlayer().RegistryProgress = data:Byte();
     end);
+    */
 
     net.Receive("BASH_REGISTRY_QUEUED", function(len)
-        LocalPlayer().QueuePlace = net.ReadInt(32);
+        LocalPlayer().QueuePlace = net.ReadInt(8);
+    end);
+
+    vnet.Watch("BASH_UPDATE_VAR", function(data)
+        local vars = data:Table();
+        for steamID, varTab in pairs(vars) do
+            BASH.Players[steamID] = BASH.Players[steamID] or {};
+            for var, val in pairs(varTab) do
+                BASH.Players[steamID][var] = val;
+            end
+        end
     end);
 elseif SERVER then
     /*
@@ -243,6 +325,7 @@ elseif SERVER then
     util.AddNetworkString("BASH_PLAYER_LOADED");
     util.AddNetworkString("BASH_REGISTRY_PROGRESS");
     util.AddNetworkString("BASH_REGISTRY_QUEUED");
+    util.AddNetworkString("BASH_UPDATE_VAR");
 end
 
 BASH:RegisterLib(BASH.Registry);

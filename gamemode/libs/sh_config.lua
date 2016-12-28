@@ -6,6 +6,13 @@ BASH.Config.Entries = BASH.Config.Entries or {};
 BASH.Config.InitialSet = BASH.Config.InitialSet or false;
 BASH.Config.Dependencies = {["GUI"] = CLIENT};
 
+local randumbNames = {
+    "Big Gay Retards",
+    "xxX_H4CK3RZ_AN0NYM0U5_Xxx",
+    "I'M A FUCKING IDIOT",
+    "The Best Server Ever",
+    "Big Dicks, No Chicks"
+};
 function BASH.Config:Init()
     /*
     **  Create Default Config Entries
@@ -17,11 +24,12 @@ function BASH.Config:Init()
     local conf = {
         ID = "community_name",
         Group = "Base Config",
+        SubGroup = "Information",
         Name = "Community Name",
         Desc = "The name of the community you wish to advertise on this server.",
         Type = "String",
-        MenuElement = "DTextEntry",
-        Default = "",
+        MenuElement = "BTextEntry",
+        Default = table.Random(randumbNames),
         AccessLevel = 100
     };
     self:AddEntry(conf);
@@ -32,10 +40,11 @@ function BASH.Config:Init()
     conf = {
         ID = "sql_host",
         Group = "Base Config",
+        SubGroup = "SQL",
         Name = "SQL Host Address",
         Desc = "The address of your SQL database.",
         Type = "String",
-        MenuElement = "DTextEntry",
+        MenuElement = "BTextEntry",
         Default = "",
         AccessLevel = 100
     };
@@ -44,10 +53,11 @@ function BASH.Config:Init()
     conf = {
         ID = "sql_user",
         Group = "Base Config",
+        SubGroup = "SQL",
         Name = "SQL Username",
         Desc = "The username to log into your SQL database.",
         Type = "String",
-        MenuElement = "DTextEntry",
+        MenuElement = "BTextEntry",
         Default = "",
         AccessLevel = 100
     };
@@ -56,10 +66,11 @@ function BASH.Config:Init()
     conf = {
         ID = "sql_pass",
         Group = "Base Config",
+        SubGroup = "SQL",
         Name = "SQL Password",
         Desc = "The password to log into your SQL database.",
         Type = "String",
-        MenuElement = "DTextEntry",
+        MenuElement = "BTextEntry",
         Default = "",
         AccessLevel = 100
     };
@@ -68,10 +79,11 @@ function BASH.Config:Init()
     conf = {
         ID = "sql_name",
         Group = "Base Config",
+        SubGroup = "SQL",
         Name = "SQL Database Name",
         Desc = "The name of your SQL database.",
         Type = "String",
-        MenuElement = "DTextEntry",
+        MenuElement = "BTextEntry",
         Default = "",
         AccessLevel = 100
     };
@@ -80,13 +92,15 @@ function BASH.Config:Init()
     conf = {
         ID = "sql_port",
         Group = "Base Config",
+        SubGroup = "SQL",
         Name = "SQL Port",
         Desc = "The port needed to connect to your SQL database. Use 3306 if you're unsure.",
         Type = "Number",
         MenuElement = "DNumberWang",
         Default = 3306,
         Min = 0,
-        Max = 9999
+        Max = 9999,
+        AccessLevel = 100
     };
     self:AddEntry(conf);
 
@@ -95,7 +109,8 @@ function BASH.Config:Init()
     */
     conf = {
         ID = "debug_enabled",
-        Group = "Developer",
+        Group = "Base Config",
+        SubGroup = "Developer",
         Name = "Debug Enabled",
         Desc = "Whether or not debug messages will print to the server console. WARNING: This will result in HUGE logs. Only enable if necessary, and disable once you're done.",
         Type = "Boolean",
@@ -104,6 +119,11 @@ function BASH.Config:Init()
         AccessLevel = 100
     };
     self:AddEntry(conf);
+
+    self:SetGroupIcon("Base Config", "cog-alt");
+    self:SetSubGroupIcon("Base Config", "Information", "info");
+    self:SetSubGroupIcon("Base Config", "SQL", "database");
+    self:SetSubGroupIcon("Base Config", "Developer", "code");
 
     hook.Call("LoadConfig", BASH);
     if SERVER then self:Load() end;
@@ -131,6 +151,7 @@ function BASH.Config:AddEntry(confTab)
     end
 
     confTab.Group =         confTab.Group or "Unsorted";
+    confTab.SubGroup =      confTab.SubGroup;
     confTab.Name =          confTab.Name or "Unknown Entry";
     confTab.Desc =          confTab.Desc or "";
     confTab.Type =          confTab.Type or "Number";
@@ -146,9 +167,46 @@ function BASH.Config:AddEntry(confTab)
     end
 
     self.Entries[confTab.Group] = self.Entries[confTab.Group] or {};
-    local len = #self.Entries[confTab.Group];
-    self.Entries[confTab.Group][len + 1] = confTab;
-    self.IDRef[confTab.ID] = self.Entries[confTab.Group][len + 1];
+    if confTab.SubGroup then
+        self.Entries[confTab.Group][confTab.SubGroup] = self.Entries[confTab.Group][confTab.SubGroup] or {};
+        local len = #self.Entries[confTab.Group][confTab.SubGroup];
+        self.Entries[confTab.Group][confTab.SubGroup][len + 1] = confTab;
+        self.IDRef[confTab.ID] = self.Entries[confTab.Group][confTab.SubGroup][len + 1];
+    else
+        local len = #self.Entries[confTab.Group];
+        self.Entries[confTab.Group][len + 1] = confTab;
+        self.IDRef[confTab.ID] = self.Entries[confTab.Group][len + 1];
+    end
+end
+
+function BASH.Config:SetGroupIcon(group, icon)
+    if !self.Entries[group] then
+        MsgErr("[BASH.Config:SetGroupIcon(%s, %s)]: Tried setting an icon for a non-existant group '%s'!", group, icon, group);
+        return;
+    end
+    if !ICONS[icon] then
+        MsgErr("[BASH.Config:SetGroupIcon(%s, %s)]: Tried setting a non-existant icon '%s' for group '%s'!", group, icon, icon, group);
+        return;
+    end
+
+    self.Entries[group].Icon = icon;
+end
+
+function BASH.Config:SetSubGroupIcon(group, sub, icon)
+    if !self.Entries[group] then
+        MsgErr("[BASH.Config:SetSubGroupIcon(%s, %s, %s)]: Tried setting an icon for a non-existant group '%s'!", group, sub, icon, group);
+        return;
+    end
+    if !self.Entries[group][sub] then
+        MsgErr("[BASH.Config:SetSubGroupIcon(%s, %s, %s)]: Tried adding an icon for a non-existant subgroup '%s'!", group, sub, icon, sub);
+        return;
+    end
+    if !ICONS[icon] then
+        MsgErr("[BASH.Config:SetSubGroupIcon(%s, %s, %s)]: Tried setting a non-existant icon '%s' for subgroup '%s->%s'!", group, sub, icon, icon, group, sub);
+        return;
+    end
+
+    self.Entries[group][sub].Icon = icon;
 end
 
 function BASH.Config:Load()
@@ -230,7 +288,10 @@ elseif SERVER then
     **  Misc. Hooks
     */
     hook.Add("PostEntInitialize", "BASH_SetInitialConfig", function(ply)
-        snow.Send(ply, "BASH_CONFIG_SET", BASH.Config.InitialSet);
+        net.Start("BASH_CONFIG_SET");
+            net.WriteBool(BASH.Config.InitialSet);
+        net.Send(ply);
+
     	if BASH.Config.InitialSet then
     		BASH.Config:Send(ply);
     	end
@@ -244,9 +305,9 @@ elseif SERVER then
     util.AddNetworkString("BASH_CONFIG_SET");
     util.AddNetworkString("BASH_CONFIG_SET_ENTRY");
 
-    net.Receive("BASH_CONFIG_SET_ENTRY", function(len, ply)
-        // Read entry data.
-        local entry = net.ReadTable();
+    vnet.Watch("BASH_CONFIG_SET_ENTRY", function(data)
+        local ply = data.Source;
+        local entry = data:Table();
 
         if !ply.SettingConfig and (ply:GetAccessLevel() < entry.AccessLevel) then
             // Log attempted entry change.
