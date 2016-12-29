@@ -21,7 +21,7 @@ function BASH.Config:Init()
     /*
     **  General Settings
     */
-    local conf = {
+    self:AddEntry{
         ID = "community_name",
         Group = "Base Config",
         SubGroup = "Information",
@@ -32,12 +32,23 @@ function BASH.Config:Init()
         Default = table.Random(randumbNames),
         AccessLevel = 100
     };
-    self:AddEntry(conf);
+
+    self:AddEntry{
+        ID = "community_name",
+        Group = "Base Config",
+        SubGroup = "Information",
+        Name = "Community Name",
+        Desc = "The name of the community you wish to advertise on this server.",
+        Type = "String",
+        MenuElement = "BTextEntry",
+        Default = table.Random(randumbNames),
+        AccessLevel = 100
+    };
 
     /*
     **  SQL Settings
     */
-    conf = {
+    self:AddEntry{
         ID = "sql_host",
         Group = "Base Config",
         SubGroup = "SQL",
@@ -48,9 +59,8 @@ function BASH.Config:Init()
         Default = "",
         AccessLevel = 100
     };
-    self:AddEntry(conf);
 
-    conf = {
+    self:AddEntry{
         ID = "sql_user",
         Group = "Base Config",
         SubGroup = "SQL",
@@ -61,9 +71,8 @@ function BASH.Config:Init()
         Default = "",
         AccessLevel = 100
     };
-    self:AddEntry(conf);
 
-    conf = {
+    self:AddEntry{
         ID = "sql_pass",
         Group = "Base Config",
         SubGroup = "SQL",
@@ -74,9 +83,8 @@ function BASH.Config:Init()
         Default = "",
         AccessLevel = 100
     };
-    self:AddEntry(conf);
 
-    conf = {
+    self:AddEntry{
         ID = "sql_name",
         Group = "Base Config",
         SubGroup = "SQL",
@@ -87,9 +95,8 @@ function BASH.Config:Init()
         Default = "",
         AccessLevel = 100
     };
-    self:AddEntry(conf);
 
-    conf = {
+    self:AddEntry{
         ID = "sql_port",
         Group = "Base Config",
         SubGroup = "SQL",
@@ -102,12 +109,11 @@ function BASH.Config:Init()
         Max = 9999,
         AccessLevel = 100
     };
-    self:AddEntry(conf);
 
     /*
     **  Developer Settings
     */
-    conf = {
+    self:AddEntry{
         ID = "debug_enabled",
         Group = "Base Config",
         SubGroup = "Developer",
@@ -118,7 +124,6 @@ function BASH.Config:Init()
         Default = false,
         AccessLevel = 100
     };
-    self:AddEntry(conf);
 
     self:SetGroupIcon("Base Config", "cog-alt");
     self:SetSubGroupIcon("Base Config", "Information", "info");

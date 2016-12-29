@@ -8,12 +8,12 @@ Thank you for installing the BASH Public Beta! This dialogue will guide you thro
 ]]
 
 function MENU:Init()
-    self:SetSize(600, 250);
+    self:SetSize(600, 400);
     self:Center();
     self:SetShowTopBar(true);
     self:SetTopBarButtons();
     self:SetDraggable(true);
-    self:SetTitle("Initial Config");
+    self:SetTitle("Edit Configuation");
 
     self:SpawnChildren();
 end

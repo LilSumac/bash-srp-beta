@@ -14,16 +14,28 @@ function BASH.Registry:Init()
     **  Create Default Variables
     */
 
-    BASH.Registry:NewVariable("BASHID",     "string", "BASH_ID",    true, "bash_players");
-    BASH.Registry:NewVariable("SteamName",  "string", "STEAM_NAME", true, "bash_players");
-    BASH.Registry:NewVariable("SteamID",    "string", "STEAM_ID",   true, "bash_players");
-    BASH.Registry:NewVariable("Rank",       "string", "default",    true, "bash_players");
-    hook.Call("LoadVariables");
+    BASH.Registry:NewVariable{
+        Name = "BASHID",
+        Type = "string",
+        Default = "BASH_ID",
+        Public = true,
+        SQLTable = "bash_players"
+    };
+
+    BASH.Registry:NewVariable{
+        Name = "SteamID",
+        Type = "string",
+        Default = "STEAM_ID",
+        Public = true,
+        SQLTable = "bash_players"
+    };
+
+    hook.Call("LoadVariables", BASH);
 end
 
 /*
 **  BASH.Registry.NewVariable
-**  Args: Name, Type, Default Value, Is Public, SQL Source Table
+**  Args: Variable Table Structure
 **
 **  Note: 'boolean' type variables must be registered with a
 **  default value of 0 (false) or 1 (true).
@@ -37,75 +49,72 @@ end
 **  value a home table, i.e. the SQL table in which this
 **  variable is saved in.
 */
-function BASH.Registry:NewVariable(name, type, default, public, sqlTable)
-    if !name or !type or !default then return end;
-    if SERVER and sqlTable then
-        if !BASH.SQL.Tables[sqlTable] then
-            local args = concatArgs(name, type, default, public, sqlTable);
-            MsgErr("[BASH.Registry:NewVariable(%s)]: This variable points to the SQL table '%s', which doesn't exist!", args, sqlTable);
+function BASH.Registry:NewVariable(var)
+    if !var.Name then return end;
+    if SERVER and var.SQLTable then
+        if !BASH.SQL.Tables[var.SQLTable] then
+            MsgErr("[BASH.Registry:NewVariable(%s)]: This variable points to the SQL table '%s', which doesn't exist!", var.Name, var.SQLTable);
             return;
         end
     end
 
-    if !self.Vars then self.Vars = {} end;
-    if self.Vars[name] then
-        local args = concatArgs(name, type, default, public, sqlTable);
-        MsgErr("[BASH.Registry:NewVariable(%s)]: A variable with that name already exists!", args);
+    self.Vars = self.Vars or {};
+    if self.Vars[var.Name] then
+        MsgErr("[BASH.Registry:NewVariable(%s)]: A variable with that name already exists!", var.Name);
         return;
     end
 
-    self.Vars[name] = {};
-    self.Vars[name].Type = type;
-    self.Vars[name].Default = default;
-    self.Vars[name].Public = public or false;
-    self.Vars[name].SQLTable = sqlTable;
+    var.Type = var.Type or "string";
+    var.Default = var.Default or "";
+    var.Public = var.Public or false;
+    var.SQLTable = var.SQLTable or "bash_players";
 
-    Player["Get" .. name] = function(_self)
+    self.Vars[var.Name] = var;
+
+    Player["Get" .. var.Name] = function(_self)
         if !checkply(_self) then return end;
         if !self.Players[_self:SteamID()] then
-            MsgErr("[Player:Get%s()]: %s not registered! (%s)", name, (CLIENT and "You're") or _self:Nick(), _self:SteamID());
+            MsgErr("[Player:Get%s()]: %s not registered! (%s)", var.Name, (CLIENT and "You're") or _self:Nick(), _self:SteamID());
             return;
         end
 
-        return self.Players[_self:SteamID()][name];
+        return self.Players[_self:SteamID()][var.Name];
     end
 
     if SERVER then
-        Player["Set" .. name] = function(_self, val)
+        Player["Set" .. var.Name] = function(_self, val)
             if !checkply(_self) then return end;
 
             local steamID = _self:SteamID();
             if !self.Players[steamID] then
-                MsgErr("[Player:Set%s(...)]: Player not registered! (%s/%s)", name, _self:Nick(), steamID);
+                MsgErr("[Player:Set%s(...)]: Player not registered! (%s/%s)", var.Name, _self:Nick(), steamID);
                 return;
             end
 
-            local var = self.Vars[name];
             val = detype(val, var.Type);
-
-            self.Players[steamID][name] = val;
+            self.Players[steamID][var.Name] = val;
 
             if var.Public then
                 self.VarBuffer = self.VarBuffer or {};
                 self.VarBuffer[steamID] = self.VarBuffer[steamID] or {};
-                self.VarBuffer[steamID][name] = val;
+                self.VarBuffer[steamID][var.Name] = val;
                 self.LastVarUpdate = SysTime();
             else
                 _self.VarBuffer = _self.VarBuffer or {};
-                _self.VarBuffer[name] = val;
+                _self.VarBuffer[var.Name] = val;
                 _self.LastVarUpdate = SysTime();
             end
         end
 
-        if sqlTable then
+        if var.SQLTable then
             if BASH.SQL.ColumnsConsolidated then
-                local args = concatArgs(name, type, default, public, sqlTable);
+                local args = detype(var, "string");
                 MsgErr("[BASH.Registry:NewVariable(%s)]: The database structure has already been consolidated! You must call this function earlier in order for this variable to be saved to the entered table.", args);
                 return;
             end
 
-            local index = #BASH.SQL.Tables[sqlTable].Struct + 1;
-            BASH.SQL.Tables[sqlTable].Struct[index] = "`" .. name .. "` " .. SQL_TYPE[type] .. ((default != "" and " DEFAULT \'" .. default .. "\'") or "");
+            local index = #BASH.SQL.Tables[var.SQLTable].Struct + 1;
+            BASH.SQL.Tables[var.SQLTable].Struct[index] = Format("`%s` %s %s", var.Name, SQL_TYPE[var.Type], ((var.Default != "" and " DEFAULT \'" .. var.Default .. "\'") or ""));
         end
     end
 end

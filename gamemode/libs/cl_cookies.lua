@@ -9,7 +9,7 @@ function BASH.Cookies:Init()
     **  Create Default Cookies
     */
 
-    local cook = {
+    self:AddEntry{
         ID = "text_size",
         Name = "Text Size",
         Type = "String",
@@ -18,9 +18,9 @@ function BASH.Cookies:Init()
         MenuElement = "DComboBox",
         Options = {"Tiny", "Standard", "Large"}
     };
-    self:AddCookie(cook);
 
-    cook = {
+    //  The defaults and options for themes are handled in the theme library.
+    self:AddEntry{
         ID = "gui_theme",
         Name = "GUI Theme",
         Type = "String",
@@ -29,10 +29,8 @@ function BASH.Cookies:Init()
         MenuElement = "DComboBox",
         Options = {}
     };
-    //  The defaults and options for themes are handled in the theme library.
-    self:AddCookie(cook);
 
-    cook = {
+    self:AddEntry{
         ID = "logging_enabled",
         Name = "Logging Enabled",
         Type = "Boolean",
@@ -40,9 +38,8 @@ function BASH.Cookies:Init()
         Default = 1,
         MenuElement = "DCheckBox"
     };
-    self:AddCookie(cook);
 
-    cook = {
+    self:AddEntry{
         ID = "filter_steamjet",
         Name = "Filter \'steamjet\'",
         Type = "Boolean",
@@ -50,9 +47,8 @@ function BASH.Cookies:Init()
         Default = 0,
         MenuElement = "DCheckBox"
     };
-    self:AddCookie(cook);
 
-    cook = {
+    self:AddEntry{
         ID = "debug_enabled",
         Name = "Enable Debug",
         Type = "Boolean",
@@ -61,9 +57,8 @@ function BASH.Cookies:Init()
         AccessLevel = 80,
         MenuElement = "DCheckBox"
     };
-    self:AddCookie(cook);
 
-    cook = {
+    self:AddEntry{
         ID = "smooth_dragging",
         Name = "Smooth Dragging",
         Type = "Boolean",
@@ -71,13 +66,12 @@ function BASH.Cookies:Init()
         Default = 1,
         MenuElement = "DCheckBox"
     };
-    self:AddCookie(cook);
 
     hook.Call("LoadCookies", BASH);
 end
 
 /*
-**  BASH.Cookies.AddCookie
+**  BASH.Cookies.AddEntry
 **  Args: {Cookie Structure Table}
 **
 **  Note: Cookies are like registry variables, only they are
@@ -93,7 +87,7 @@ end
 **  stored as a number in the cl.db file, but will be de-typed
 **  when retrieved or stored.
 */
-function BASH.Cookies:AddCookie(cook)
+function BASH.Cookies:AddEntry(cook)
     if !cook.ID or !cook.Type then return end;
 
     if self.Entries[cook.ID] then

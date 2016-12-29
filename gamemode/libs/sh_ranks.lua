@@ -9,54 +9,49 @@ function BASH.Ranks:Init()
     /*
     **  Create Default Ranks
     */
-    local rank = {
+    self:AddEntry{
         ID = "owner",
         Name = "Owner",
         AccessLevel = 100
     };
-    self:NewRank(rank);
 
-    rank = {
+    self:AddEntry{
         ID = "dev",
         Name = "Developer",
         Desc = "A developer of the server. Has complete control over everything.",
         AccessLevel = 100
     };
-    self:NewRank(rank);
 
-    rank = {
+    self:AddEntry{
         ID = "sadmin",
         Name = "Super Admin",
         Desc = "",
         AccessLevel = 90
     };
-    self:NewRank(rank);
 
-    rank = {
+    self:AddEntry{
         ID = "admin",
         Name = "Admin",
         Desc = "",
         AccessLevel = 80
     };
-    self:NewRank(rank);
 
-    rank = {
+    self:AddEntry{
         ID = "default",
         Name = "",
         Desc = "",
         AccessLevel = 0
     };
-    self:NewRank(rank);
 end
 
-function BASH.Ranks:NewRank(rankTab)
+function BASH.Ranks:AddEntry(rankTab)
     if !rankTab then return end;
     if !rankTab.ID or !rankTab.Name then
-        MsgErr("[BASH.Ranks:NewRank(%s)]: Tried adding a new rank with no ID/Name!", concatArgs(rankTab));
+        MsgErr("[BASH.Ranks:AddEntry(%s)]: Tried adding a new rank with no ID/Name!", concatArgs(rankTab));
         return;
     end
     if self.Entries[rankTab.ID] then
-        MsgErr("[BASH.Ranks:NewRank(%s)]: A rank with the ID '%s' already exists!", concatArgs(rankTab), rankTab.ID);
+        MsgErr("[BASH.Ranks:AddEntry(%s)]: A rank with the ID '%s' already exists!", concatArgs(rankTab), rankTab.ID);
         return;
     end
 

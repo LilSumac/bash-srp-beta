@@ -6,7 +6,7 @@ BASH.Themes.PushOnInit = BASH.Themes.PushOnInit or false;
 BASH.Themes.Dependencies = {["Cookies"] = CLIENT};
 
 function BASH.Themes:Init()
-    local theme = {
+    self:AddEntry{
         ID = "bash_dusk",
         Name = "BASH Dusk Theme",
         Colors = {
@@ -32,7 +32,6 @@ function BASH.Themes:Init()
         },
         Default = true
     };
-    self:AddEntry(theme);
 
     hook.Call("LoadThemes", BASH);
 end

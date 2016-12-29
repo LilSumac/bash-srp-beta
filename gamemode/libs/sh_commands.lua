@@ -7,7 +7,7 @@ BASH.Commands.KeywordRef = BASH.Commands.KeywordRef or {};
 BASH.Commands.Dependencies = {["Ranks"] = true, ["SQL"] = SERVER};
 
 function BASH.Commands:Init()
-    local comm = {
+    self:AddEntry{
         ID = "initconfig",
         Name = "Initialize Config",
         Desc = "Starts the inital config to be set up by the targeted player.",
@@ -45,9 +45,8 @@ function BASH.Commands:Init()
             MsgCon(color_green, true, "Commencing config initialization on player %s [%s].", target:Name(), target:SteamID());
         end
     };
-    self:AddEntry(comm);
 
-    comm = {
+    self:AddEntry{
         ID = "setowner",
         Name = "Set Owner",
         Desc = "Add a player to the \'owner\' rank through the server console.",
@@ -81,9 +80,8 @@ function BASH.Commands:Init()
             MsgN(target:GetRank());
         end
     };
-    self:AddEntry(comm);
 
-    comm = {
+    self:AddEntry{
         ID = "maxlast",
         Name = "Maximize Last",
         Desc = "Maximize the last window minimized.",
@@ -99,19 +97,6 @@ function BASH.Commands:Init()
             BASH.GUI.LastMinimized = nil;
         end
     };
-    self:AddEntry(comm);
-
-    comm = {
-        ID = "shitter",
-        Name = "Shit Last",
-        Desc = "Shit the last window shitted.",
-        Keywords = {"shit"},
-        IsInScope = CLIENT,
-        Function = function(self, ply, args)
-
-        end
-    };
-    self:AddEntry(comm);
 
     hook.Call("LoadCommands", BASH);
 end
@@ -145,14 +130,6 @@ function BASH.Commands:AddEntry(commTab)
         self.KeywordRef[keyword] = commTab;
     end
     self.Entries[commTab.ID] = commTab;
-end
-
-function Player:CanExecute(cmd)
-    if isstring(cmd) then
-        cmd = BASH.Commands.Entries[cmd];
-    end
-    if !cmd then return false end;
-    return cmd.IsInScope and (ply:GetAccessLevel() >= cmd.AccessLevel);
 end
 
 concommand.Add("bash", function(ply, cmd, args)

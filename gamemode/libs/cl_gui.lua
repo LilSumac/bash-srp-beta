@@ -12,13 +12,12 @@ function BASH.GUI:Init()
     **  Create Default GUI Elements
     */
 
-    local gui = {
+    self:AddEntry{
         ID = "menu_config",
         Name = "Initial Config",
         Class = "menu_config",
         RequiresMouse = true
     };
-    self:AddEntry(gui);
 
     hook.Call("LoadGUI", BASH);
 end
