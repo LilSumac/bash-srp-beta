@@ -8,7 +8,7 @@ Thank you for installing the BASH Public Beta! This dialogue will guide you thro
 ]]
 
 function MENU:Init()
-    self:SetSize(600, 400);
+    self:SetSize(600, 300);
     self:Center();
     self:SetShowTopBar(true);
     self:SetTopBarButtons();
@@ -19,11 +19,16 @@ function MENU:Init()
 end
 
 function MENU:SpawnChildren()
-    //  Shoddy way of ordering it the way I like. :^)
-    local orderedConfig = {"Information", "SQL", "Developer"};
     local conf, subConf, tabs = BASH.Config.Entries["Base Config"], {}, {};
-    local index = 2;
-    tabs[1] = {Type = TAB_BOTH, Text = "Welcome", Icon = "heart-empty", Default = true};
+    local orderedConfig = BASH.Config.SubGroupOrder["Base Config"];
+    local index;
+    if BASH.ConfigSet then
+        index = 1;
+    else
+        tabs[1] = {Type = TAB_BOTH, Text = "Welcome", Icon = "heart-empty", Default = true};
+        index = 2;
+    end
+
     for _, sub in pairs(orderedConfig) do
         subConf = conf[sub];
         if !istable(subConf) then continue end;
@@ -126,18 +131,8 @@ function MENU:SpawnChildren()
             end
         end
 
-        local errMsg = parent:GetContentByID("submit_error");
-        errMsg:SetVisible(true);
-        errMsg:SetVisibleByDefault(true);
+        PrintTable(parent.Settings)
     end
-
-    tempPanel = self:AddContent("BLongText", index, "submit_error");
-    tempPanel:SetFont("DermaDefault");
-    tempPanel:SetTextColor(color_red);
-    tempPanel:AlignTo("submit_button", ALIGN_RIGHTCENT, 6);
-    tempPanel:SetText("Not all required config values have been set! Please go back and make sure all required fields are filled out and valid.", w - tempPanel:GetPos() - 6);
-    tempPanel:SetVisible(false);
-    tempPanel:SetVisibleByDefault(false);
 end
 
 function MENU:VerifyConfig()

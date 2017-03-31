@@ -137,13 +137,14 @@ function checkply(ent)
     return ent:IsValid() and ent:IsPlayer();
 end
 
-function detype(var, typeStr, formatTable)
+function detype(var, typeStr)
+    if var == nil then return var end;
     if !typeStr then return end;
     if type(var) == typeStr then return var end;
     if type(var) == "table" and typeStr == "string" then
-        return util.TableToJSON(var or {}, formatTable) or "[]";
+        return von.serialize(var or {});
     elseif type(var) == "string" and typeStr == "table" then
-        return util.JSONToTable(var or "[]") or {};
+        return von.deserialize(var or "");
     elseif type(var) == "string" and typeStr == "number" then
         return tonumber(var) or 0;
     elseif type(var) == "number" and typeStr == "string" then
@@ -267,9 +268,7 @@ end
 function BASH:RegisterLib(lib)
     if !lib then return end;
 
-    if !self.Libraries then
-        self.Libraries = {};
-    end
+    self.Libraries = self.Libraries or {};
     lib.Name = lib.Name or "Unnamed Library$" .. randomString(8);
     self.Libraries[lib.Name] = lib;
     MsgCon(color_green, true, "Registered '%s' library.", lib.Name);

@@ -2,7 +2,7 @@ local BASH = BASH;
 BASH.Config = BASH.Config or {};
 BASH.Config.Name = "Config";
 BASH.Config.IDRef = BASH.Config.IDRef or {};
-BASH.Config.Entries = BASH.Config.Entries or {};
+BASH.Config.Groups = BASH.Config.Groups or {};
 BASH.Config.InitialSet = BASH.Config.InitialSet or false;
 BASH.Config.Dependencies = {["GUI"] = CLIENT};
 
@@ -14,92 +14,78 @@ local randumbNames = {
     "Big Dicks, No Chicks"
 };
 function BASH.Config:Init()
+    self:AddGroup("Base Config", "cog-alt");
+    self:AddGroup("Unsorted", "ellipsis");
+
     /*
     **  Create Default Config Entries
-    */
-
-    /*
     **  General Settings
     */
-    self:AddEntry{
+    self:AddEntry({
         ID = "community_name",
-        Group = "Base Config",
-        SubGroup = "Information",
         Name = "Community Name",
         Desc = "The name of the community you wish to advertise on this server.",
         Type = "String",
         MenuElement = "BTextEntry",
         Default = table.Random(randumbNames),
         AccessLevel = 100
-    };
+    }, "Base Config");
 
-    self:AddEntry{
-        ID = "community_name",
-        Group = "Base Config",
-        SubGroup = "Information",
-        Name = "Community Name",
-        Desc = "The name of the community you wish to advertise on this server.",
+    self:AddEntry({
+        ID = "community_website",
+        Name = "Community Website",
+        Desc = "The website that your community is hosted on. (Optional)",
         Type = "String",
         MenuElement = "BTextEntry",
-        Default = table.Random(randumbNames),
+        Default = "",
         AccessLevel = 100
-    };
+    }, "Base Config");
 
     /*
     **  SQL Settings
     */
-    self:AddEntry{
+    self:AddEntry({
         ID = "sql_host",
-        Group = "Base Config",
-        SubGroup = "SQL",
         Name = "SQL Host Address",
         Desc = "The address of your SQL database.",
         Type = "String",
         MenuElement = "BTextEntry",
         Default = "",
         AccessLevel = 100
-    };
+    }, "Base Config");
 
-    self:AddEntry{
+    self:AddEntry({
         ID = "sql_user",
-        Group = "Base Config",
-        SubGroup = "SQL",
         Name = "SQL Username",
         Desc = "The username to log into your SQL database.",
         Type = "String",
         MenuElement = "BTextEntry",
         Default = "",
         AccessLevel = 100
-    };
+    }, "Base Config");
 
-    self:AddEntry{
+    self:AddEntry({
         ID = "sql_pass",
-        Group = "Base Config",
-        SubGroup = "SQL",
         Name = "SQL Password",
         Desc = "The password to log into your SQL database.",
         Type = "String",
         MenuElement = "BTextEntry",
         Default = "",
         AccessLevel = 100
-    };
+    }, "Base Config");
 
-    self:AddEntry{
+    self:AddEntry({
         ID = "sql_name",
-        Group = "Base Config",
-        SubGroup = "SQL",
         Name = "SQL Database Name",
         Desc = "The name of your SQL database.",
         Type = "String",
         MenuElement = "BTextEntry",
         Default = "",
         AccessLevel = 100
-    };
+    }, "Base Config");
 
-    self:AddEntry{
+    self:AddEntry({
         ID = "sql_port",
-        Group = "Base Config",
-        SubGroup = "SQL",
         Name = "SQL Port",
         Desc = "The port needed to connect to your SQL database. Use 3306 if you're unsure.",
         Type = "Number",
@@ -108,146 +94,108 @@ function BASH.Config:Init()
         Min = 0,
         Max = 9999,
         AccessLevel = 100
-    };
+    }, "Base Config");
 
     /*
     **  Developer Settings
     */
-    self:AddEntry{
+    self:AddEntry({
         ID = "debug_enabled",
-        Group = "Base Config",
-        SubGroup = "Developer",
         Name = "Debug Enabled",
         Desc = "Whether or not debug messages will print to the server console. WARNING: This will result in HUGE logs. Only enable if necessary, and disable once you're done.",
         Type = "Boolean",
         MenuElement = "DCheckBox",
         Default = false,
         AccessLevel = 100
-    };
-
-    self:SetGroupIcon("Base Config", "cog-alt");
-    self:SetSubGroupIcon("Base Config", "Information", "info");
-    self:SetSubGroupIcon("Base Config", "SQL", "database");
-    self:SetSubGroupIcon("Base Config", "Developer", "code");
+    }, "Base Config");
 
     hook.Call("LoadConfig", BASH);
-    if SERVER then self:Load() end;
+    if CLIENT then return end;
+    self:Load();
+end
+
+function BASH.Config:AddGroup(name, icon)
+    local tab = Conf_Group:Create(name, icon);
+    if !tab then return end;
+    MsgCon(color_green, false, "Creating config group '%s'!", name);
+    table.insert(self.Groups, (name != "Unsorted" and #self.Groups > 0 and #self.Groups) or (#self.Groups + 1), tab);
+end
+
+function BASH.Config:GetGroup(name)
+    for index, groupTab in pairs(self.Groups) do
+        if groupTab.Name == name then return groupTab end;
+    end
 end
 
 /*
 **  BASH.Config.AddEntry
-**  Args: {Config Structure Table}
+**  Args: {Config Structure Table}, "Group Name"
 **
 **  Note: Config is used for storing settings used exclusively
 **  by the server that can be changed by authorized players.
 **  They are saved in a text file on the server in a JSON
 **  format for ease of use/saving.
 */
-function BASH.Config:AddEntry(confTab)
+function BASH.Config:AddEntry(confTab, group)
     if !confTab then return end;
-    if !confTab.ID then
-        MsgErr("[BASH.Config:AddEntry(%s)]: Tried adding a config entry with no ID into group '%s'!", concatArgs(confTab), confTab.Group or "Unsorted");
-        return;
-    end
-    if self.IDRef[confTab.ID] then
-        local exists = self.IDRef[confTab.ID];
-        MsgErr(color_red, "A config entry with the ID '%s' already exists in group '%s'!", confTab.ID, exists.Group);
+    if !group then group = "Unsorted" end;
+    local groupTab = self:GetGroup(group);
+    if !groupTab then
+        MsgErr("[BASH.Config.AddEntry] -> Tried adding a config entry to a non-existant group '%s'!", group);
         return;
     end
 
-    confTab.Group =         confTab.Group or "Unsorted";
-    confTab.SubGroup =      confTab.SubGroup;
-    confTab.Name =          confTab.Name or "Unknown Entry";
-    confTab.Desc =          confTab.Desc or "";
-    confTab.Type =          confTab.Type or "Number";
-    confTab.MenuElement =   confTab.MenuElement or "DNumberWang";
-    confTab.Default =       confTab.Default or 0;
-    confTab.AccessLevel =   confTab.AccessLevel or 100;
-    if confTab.Type == "Number" then
-        confTab.Min = confTab.Min or 0;
-        confTab.Max = confTab.Max or 1;
-    end
-    if confTab.MenuElement == "DComboBox" then
-        confTab.Options = confTab.Options or {"Option 1", "Option 2"};
-    end
-
-    self.Entries[confTab.Group] = self.Entries[confTab.Group] or {};
-    if confTab.SubGroup then
-        self.Entries[confTab.Group][confTab.SubGroup] = self.Entries[confTab.Group][confTab.SubGroup] or {};
-        local len = #self.Entries[confTab.Group][confTab.SubGroup];
-        self.Entries[confTab.Group][confTab.SubGroup][len + 1] = confTab;
-        self.IDRef[confTab.ID] = self.Entries[confTab.Group][confTab.SubGroup][len + 1];
-    else
-        local len = #self.Entries[confTab.Group];
-        self.Entries[confTab.Group][len + 1] = confTab;
-        self.IDRef[confTab.ID] = self.Entries[confTab.Group][len + 1];
+    if groupTab:AddEntry(confTab) then
+        self.IDRef[confTab.ID] = confTab;
     end
 end
 
-function BASH.Config:SetGroupIcon(group, icon)
-    if !self.Entries[group] then
-        MsgErr("[BASH.Config:SetGroupIcon(%s, %s)]: Tried setting an icon for a non-existant group '%s'!", group, icon, group);
-        return;
-    end
-    if !ICONS[icon] then
-        MsgErr("[BASH.Config:SetGroupIcon(%s, %s)]: Tried setting a non-existant icon '%s' for group '%s'!", group, icon, icon, group);
-        return;
-    end
-
-    self.Entries[group].Icon = icon;
-end
-
-function BASH.Config:SetSubGroupIcon(group, sub, icon)
-    if !self.Entries[group] then
-        MsgErr("[BASH.Config:SetSubGroupIcon(%s, %s, %s)]: Tried setting an icon for a non-existant group '%s'!", group, sub, icon, group);
-        return;
-    end
-    if !self.Entries[group][sub] then
-        MsgErr("[BASH.Config:SetSubGroupIcon(%s, %s, %s)]: Tried adding an icon for a non-existant subgroup '%s'!", group, sub, icon, sub);
-        return;
-    end
-    if !ICONS[icon] then
-        MsgErr("[BASH.Config:SetSubGroupIcon(%s, %s, %s)]: Tried setting a non-existant icon '%s' for subgroup '%s->%s'!", group, sub, icon, icon, group, sub);
-        return;
-    end
-
-    self.Entries[group][sub].Icon = icon;
+function BASH.Config:GetEntry(id)
+    return self.IDRef[id or ""];
 end
 
 function BASH.Config:Load()
     BASH:CreateDirectory("bash/config");
 
-    local fileName, fileCont;
-    for group, groupTab in pairs(self.Entries) do
-        fileName = string.lower(BASH:GetSafeFilename(group));
-        if !file.Exists("bash/config/" .. fileName, "DATA") then
-            BASH:CreateFile("bash/config/" .. fileName);
-            fileCont = nil;
-            if group == "Base Config" then
-                self.InitialSet = false;
-            end
-
-            // Fill the empty file for next server load.
-            local fillFile = {};
-            for index, confEntry in pairs(groupTab) do
-                fillFile[confEntry.ID] = detype(confEntry.Default, string.lower(confEntry.Type));
-            end
-            fillFile.HasBeenSet = false;
-            fillFile = detype(fillFile, "string", true);
-            BASH:WriteToFile("bash/config/" .. fileName, fillFile, true);
-        else
-            fileCont = file.Read("bash/config/" .. fileName, "DATA");
-            fileCont = detype(fileCont, "table");
-            if group == "Base Config" then
-                self.InitialSet = fileCont.HasBeenSet;
-            end
-        end
-
-        if group == "Base Config" and !self.InitialSet then continue end;
-        for index, confEntry in pairs(groupTab) do
-            confEntry.Value = (fileCont[confEntry.ID] != nil and detype(fileCont[confEntry.ID], string.lower(confEntry.Type))) or confEntry.Default;
+    if !file.Exists("bash/config/setup.txt", "DATA") then
+        self.InitialSet = false;
+        BASH:CreateFile("bash/config/setup.txt");
+        BASH:WriteToFile("bash/config/setup.txt", "false", true);
+        MsgCon(color_red, false, "No config has been set yet. Be sure to do so before continuing server use.");
+        return;
+    else
+        self.InitialSet = tobool(file.Read("bash/config/setup.txt", "DATA"));
+        if !self.InitialSet then
+            MsgCon(color_red, false, "No config has been set yet. Be sure to do so before continuing server use.");
+            return;
         end
     end
+
+    local fileName, fileCont;
+    for _, groupTab in pairs(self.Groups) do
+        fileName = "bash/config/" .. string.lower(BASH:GetSafeFilename(groupTab.Name));
+        if !file.Exists(fileName, "DATA") then
+            BASH:CreateFile(fileName);
+
+            fileCont = {};
+            for __, confTab in pairs(groupTab.Entries) do
+                fileCont[confTab.ID] = confTab.Default;
+            end
+            fileCont = detype(fileCont, "string");
+            BASH:WriteToFile(fileName, fileCont, true);
+        else
+            fileCont = file.Read(fileName, "DATA");
+            fileCont = detype(fileCont, "table");
+        end
+
+        for __, confTab in pairs(groupTab.Entries) do
+            confTab.Value = (fileCont[confTab.ID] != nil and detype(fileCont[confTab.ID], string.lower(confTab.Type))) or confTab.Default;
+        end
+    end
+end
+
+function BASH.Config:Save()
+
 end
 
 function BASH.Config:Send(recipients)
@@ -274,6 +222,7 @@ end
 
 function BASH.Config:Exit()
     MsgCon(color_green, true, "Saving config...");
+    self:Save();
 end
 
 if CLIENT then

@@ -22,4 +22,4 @@ ITEM.Lockable = true;
 ITEM.LockedByDefault = false;
 
 //	Register the base.
-BASH.Items:NewBase(ITEM);
+//BASH.Items:NewBase(ITEM);

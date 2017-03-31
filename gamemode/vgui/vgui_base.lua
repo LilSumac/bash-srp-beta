@@ -227,8 +227,8 @@ function PANEL:SetTabs(tabs)
             self.BTabs[index]:SetSize(width, self.TopBarSize);
             self.BTabs[index]:SetIndex(index);
             self.BTabs[index]:SetType(tab.Type);
-            self.BTabs[index]:SetBText(tab.Text);
-            self.BTabs[index]:SetBIcon(tab.Icon);
+            self.BTabs[index]:SetText(tab.Text);
+            self.BTabs[index]:SetIcon(tab.Icon);
             self.BTabs[index]:SetCallback(tab.Callback);
 
             if tab.Default then
@@ -678,6 +678,7 @@ function TAB:Init()
     self.Text = "";
     self.Icon = {};
     self:SetText("");
+    self:SetTextColor(color_trans);
 end
 
 function TAB:SetIndex(ind)
@@ -688,13 +689,14 @@ function TAB:SetType(type)
     self.Type = type;
 end
 
-function TAB:SetBText(text)
+function TAB:SetText(text)
     self.Text = text;
 end
 
-function TAB:SetBIcon(iconID)
+function TAB:SetIcon(iconID)
+    if self.IsSpacer then return end;
     if !ICONS[iconID] then
-        MsgErr("[TAB:SetBIcon(%s)]: No icon found with that ID!", iconID);
+        MsgErr("[TAB:SetIcon(%s)]: No icon found with that ID!", iconID);
         return;
     end
 
@@ -742,7 +744,6 @@ function TAB:DoClick()
         end
     end
 
-
     parent:InvalidateLayout();
 end
 
@@ -775,7 +776,7 @@ function TAB:Paint(w, h)
     end
 
     local x = h * 0.125;
-    if self.Type != TAB_TEXT then
+    if self.Type == TAB_ICON or self.Type == TAB_BOTH then
         if self.Icon.Font and self.Icon.Value then
             local size = h * 0.75;
             draw.SimpleText(string.char(self.Icon.Value), "bash-icons-" .. self.Icon.Font, x + (size / 2), x + (size / 2), Color(200, 200, 200), TEXT_CENT, TEXT_CENT);
@@ -783,7 +784,7 @@ function TAB:Paint(w, h)
         end
     end
 
-    if self.Type != TAB_ICON then
+    if self.Type == TAB_TEXT or self.Type == TAB_BOTH then
         x = (self.Type == TAB_TEXT and w / 2) or x;
         draw.SimpleText(
             self.Text, "CenterPrintText", x, h / 2,

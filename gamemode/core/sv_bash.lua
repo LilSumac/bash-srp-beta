@@ -4,7 +4,7 @@ function BASH:Init()
 	if self.Initialized then return end;
 
 	self:LibInit();
-
+	
 	MsgCon(color_green, true, "Successfully initialized server-side. Init time: %f seconds.", math.Round(SysTime() - self.StartTime, 5));
 	self.Initialized = true;
 	hook.Call("OnInit", self);

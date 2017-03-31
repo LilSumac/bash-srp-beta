@@ -8,7 +8,7 @@ color_sql = Color(0, 204, 204, 255);
 color_cookie = Color(204, 102, 0, 255);
 
 CORE_DIRS = {
-    ["core"] =      true, ["external"] = true,
+    ["core"] =      true, ["external"] =  true,
     ["hooks"] =     true, ["items"] =     true,
     ["libs"] =      true, ["net"] =       true,
     ["obj"] =       true, ["vgui"] =      true
@@ -82,27 +82,29 @@ SQL_LOCAL = 1;
 SQL_GLOBAL = 2;
 
 if CLIENT then
+    LP = LocalPlayer;
+    
 	SCRW = ScrW();
 	SCRH = ScrH();
 	CENTER_X = SCRW / 2;
 	CENTER_Y = SCRH / 2;
 
-    ALIGN_ABOVE = 1;
-    ALIGN_ABOVELEFT = 2;
-    ALIGN_ABOVECENT = 3;
-    ALIGN_ABOVERIGHT = 4;
-    ALIGN_BELOW = 5;
-    ALIGN_BELOWLEFT = 6;
-    ALIGN_BELOWCENT = 7;
-    ALIGN_BELOWRIGHT = 8;
-    ALIGN_LEFT = 9;
-    ALIGN_LEFTTOP = 10;
-    ALIGN_LEFTCENT = 11;
-    ALIGN_LEFTBOT = 12;
-    ALIGN_RIGHT = 13;
-    ALIGN_RIGHTTOP = 14;
-    ALIGN_RIGHTCENT = 15;
-    ALIGN_RIGHTBOT = 16;
+    ALIGN_ABOVE =       1;
+    ALIGN_ABOVELEFT =   2;
+    ALIGN_ABOVECENT =   3;
+    ALIGN_ABOVERIGHT =  4;
+    ALIGN_BELOW =       5;
+    ALIGN_BELOWLEFT =   6;
+    ALIGN_BELOWCENT =   7;
+    ALIGN_BELOWRIGHT =  8;
+    ALIGN_LEFT =        9;
+    ALIGN_LEFTTOP =     10;
+    ALIGN_LEFTCENT =    11;
+    ALIGN_LEFTBOT =     12;
+    ALIGN_RIGHT =       13;
+    ALIGN_RIGHTTOP =    14;
+    ALIGN_RIGHTCENT =   15;
+    ALIGN_RIGHTBOT =    16;
 
     TEXT_LEFT = 0;
     TEXT_CENT = 1;

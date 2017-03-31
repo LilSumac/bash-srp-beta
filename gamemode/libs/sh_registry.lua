@@ -144,15 +144,12 @@ if SERVER then
         BASH.Registry.VarBuffer = BASH.Registry.VarBuffer or {};
         BASH.Registry.LastVarUpdate = BASH.Registry.LastVarUpdate or 0;
         if table.Count(BASH.Registry.VarBuffer) > 0 and SysTime() - BASH.Registry.LastVarUpdate > 0.5 then
-            local ply, removeTab = nil, {};
+            local ply;
             for steamID, varTab in pairs(BASH.Registry.VarBuffer) do
                 ply = player.GetBySteamID(steamID);
                 if !checkply(ply) then
-                    removeTab[steamID] = true;
+                    BASH.Registry.VarBuffer[steamID] = nil;
                 end
-            end
-            for steamID, _ in pairs(removeTab) do
-                BASH.Registry.VarBuffer[steamID] = nil;
             end
 
             local broadcastPacket = vnet.CreatePacket("BASH_UPDATE_VAR");
@@ -170,18 +167,10 @@ if SERVER then
             if SysTime() - ply.LastVarUpdate < 0.5 then continue end;
 
             steamID = ply:SteamID();
-            curTab = {};
-            curTab[steamID] = {};
             for var, val in pairs(ply.VarBuffer) do
-                curTab[steamID][var] = val;
+                BASH.Registry.VarBuffer[steamID][var] = val;
             end
-
-            if table.Count(curTab[steamID]) > 0 then
-                curPacket = vnet.CreatePacket("BASH_UPDATE_VAR");
-                curPacket:Table(curTab);
-                curPacket:AddTargets(ply);
-                curPacket:Send();
-            end
+            ply.VarBuffer = {};
         end
     end);
 
@@ -304,7 +293,7 @@ if CLIENT then
     **  Networking
     */
     net.Receive("BASH_PLAYER_LOADED", function(len)
-        LocalPlayer().Initialized = true;
+        LP().Initialized = true;
         BASH.IntroStage = 2;
     end);
 
@@ -314,8 +303,8 @@ if CLIENT then
     end);
     */
 
-    net.Receive("BASH_REGISTRY_QUEUED", function(len)
-        LocalPlayer().QueuePlace = net.ReadInt(8);
+    vnet.Watch("BASH_REGISTRY_QUEUED", function(data)
+        LP().QueuePlace = data:Byte();
     end);
 
     vnet.Watch("BASH_UPDATE_VAR", function(data)
