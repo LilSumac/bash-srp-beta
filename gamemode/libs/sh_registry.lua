@@ -140,6 +140,7 @@ function Player:SetVars(vars, vals)
 end
 
 if SERVER then
+
     hook.Add("Think", "BASH_HandleVarUpdateQueue", function()
         BASH.Registry.VarBuffer = BASH.Registry.VarBuffer or {};
         BASH.Registry.LastVarUpdate = BASH.Registry.LastVarUpdate or 0;
@@ -190,14 +191,9 @@ if SERVER then
             BASH.Registry.Queue = Queue:Create();
         end
 
-        BASH.Registry.Queue:print();
         local nextPos = BASH.Registry.Queue:first();
     	if nextPos and nextPos != steamID then
-            local index = BASH.Registry.Queue:enqueue(steamID);
-            net.Start("BASH_REGISTRY_QUEUED");
-                net.WriteInt(index, 8);
-            net.Send(self);
-
+            BASH.Registry.Queue:enqueue(steamID);
     		self.SQLData = data;
     		return;
     	elseif !nextPos then
@@ -286,6 +282,7 @@ if SERVER then
             packet:Send();
         end
     end
+
 end
 
 if CLIENT then
@@ -316,6 +313,7 @@ if CLIENT then
             end
         end
     end);
+
 elseif SERVER then
     /*
     **  Networking
@@ -324,6 +322,7 @@ elseif SERVER then
     util.AddNetworkString("BASH_REGISTRY_PROGRESS");
     util.AddNetworkString("BASH_REGISTRY_QUEUED");
     util.AddNetworkString("BASH_UPDATE_VAR");
+
 end
 
 BASH:RegisterLib(BASH.Registry);

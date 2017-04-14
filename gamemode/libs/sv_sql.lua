@@ -4,6 +4,7 @@ BASH.SQL.Name = "SQL";
 BASH.SQL.DB = BASH.SQL.DB or nil;
 BASH.SQL.Connected = BASH.SQL.Connected or false;
 BASH.SQL.Tables = BASH.SQL.Tables or {};
+BASH.SQL.GlobalCreateNum = BASH.SQL.GlobalCreateNum or 0;
 BASH.SQL.ServerData = BASH.SQL.ServerData or {};
 local Player = FindMetaTable("Player");
 
@@ -20,64 +21,68 @@ end
 /*
 **  BASH Hooks
 */
-function BASH:GatherSQLTables()
-    //  Construct the characters table.
-    local chars = {
-        "`CharName` TEXT NOT NULL",
-        "`CharDesc` TEXT NOT NULL",
-        "`Model` TEXT NOT NULL",
-        "`Weapons` TEXT NOT NULL",
-        "`Equipment` TEXT NOT NULL"
-    };
-    self.SQL:NewTable("bash_characters", SQL_GLOBAL, DATA_CHAR, "#!/BASH", chars);
-
-    //  Construct the bans table.
-    local bans = {
-        "`VictimName` TEXT NOT NULL",
-        "`VictimSteamID` TEXT NOT NULL",
-        "`BannerName` TEXT NOT NULL",
-        "`BannerSteamID` TEXT NOT NULL",
-        "`BanTime` INT(10) NOT NULL",
-        "`BanLength` INT(10) NOT NULL",
-        "`BanReason` TEXT NOT NULL"
-    };
-    self.SQL:NewTable("bash_bans", SQL_GLOBAL, DATA_SERVER, "#!/BASH", bans);
-end
-
+function BASH:GatherSQLTables() end;
 function BASH:EditSQLTables() end;
-
-/*
-**  Default SQL Structure [Do Not Edit]
-**
-**  Note: 'bash_players' is the default table; it
-**  must always exist as long as SQL is used to
-**  store player data.
-*/
-BASH.SQL.Tables["bash_players"] = {};
-BASH.SQL.Tables["bash_players"].SQLScope = SQL_GLOBAL;
-BASH.SQL.Tables["bash_players"].DataScope = DATA_PLY;
-BASH.SQL.Tables["bash_players"].Origin = "#!/BASH";
-BASH.SQL.Tables["bash_players"].Struct = {};
-BASH.SQL.Tables["bash_players"].Struct[1] = "`PlayerNum` INT(10) UNSIGNED NOT NULL";
-BASH.SQL.Tables["bash_players"].Struct[2] = "`BASHID` TEXT NOT NULL";
-BASH.SQL.Tables["bash_players"].Struct[3] = "`SteamName` TEXT NOT NULL";
-BASH.SQL.Tables["bash_players"].Struct[4] = "`SteamID` TEXT NOT NULL";
-BASH.SQL.Tables["bash_players"].Struct[5] = "`PlayerFlags` TEXT NOT NULL";
-BASH.SQL.Tables["bash_players"].PrimaryKey = "PlayerNum";
 
 function BASH.SQL:Init()
     if self.DB then return end;
+
+    /*
+    **  Default SQL Structure [Do Not Edit]
+    **
+    **  Note: 'bash_players' is the default table; it
+    **  must always exist as long as SQL is used to
+    **  store player data.
+    */
+    self:AddTable{
+        Name = "bash_players",
+        Type = SQL_GLOBAL,
+        Scope = DATA_PLY,
+        Struct = {
+            "`SteamName` TEXT NOT NULL",
+            "`SteamID` TEXT NOT NULL",
+            "`PlayerFlags` TEXT NOT NULL"
+        }
+    };
+
+    self:AddTable{
+        Name = "bash_characters",
+        Type = SQL_GLOBAL,
+        Scope = DATA_CHAR,
+        Struct = {
+            "`CharName` TEXT NOT NULL",
+            "`CharDesc` TEXT NOT NULL",
+            "`Model` TEXT NOT NULL",
+            "`Weapons` TEXT NOT NULL",
+            "`Equipment` TEXT NOT NULL"
+        }
+    };
+
+    self:AddTable{
+        Name = "bash_bans",
+        Type = SQL_GLOBAL,
+        Scope = DATA_PLY,
+        Struct = {
+            "`VictimName` TEXT NOT NULL",
+            "`VictimSteamID` TEXT NOT NULL",
+            "`BannerName` TEXT NOT NULL",
+            "`BannerSteamID` TEXT NOT NULL",
+            "`BanTime` INT(10) NOT NULL",
+            "`BanLength` INT(10) NOT NULL",
+            "`BanReason` TEXT NOT NULL"
+        }
+    };
 
     hook.Call("GatherSQLTables", BASH);
 	hook.Call("EditSQLTables", BASH);
 
     if !tmysql then
-        MsgErr("[BASH:SQLInit()]: tmysql doesn't exist!");
+        MsgErr("[BASH.SQL.Init] -> tmysql wasn't found!");
         return;
     end
 
     if !BASH.Config.InitialSet then
-        MsgErr("[BASH.SQL:Init()]: Cannot setup the database until config has been initially set!");
+        MsgErr("[BASH.SQL.Init] -> Cannot setup the database until config has been initially set!");
         return;
     end
 
@@ -89,7 +94,7 @@ function BASH.SQL:Init()
     local status, err = self.DB:Connect();
 
     if !status then
-        MsgErr("[BASH:SQLInit()]: Unable to connect to database!");
+        MsgErr("[BASH.SQL.Init] -> Unable to connect to database!");
         MsgErr(err);
         self.Connected = false;
     else
@@ -101,10 +106,8 @@ end
 
 function BASH.SQL:Query(query, sqlType, callback, obj)
     if !query or query == "" then return end;
-    if !sqlType or sqlType == 0 then return end;
-    if sqlType == SQL_GLOBAL and !callback then
-        MsgErr("[BASH.SQL:Query()]: Tried to make a global SQL query without a callback function!");
-        MsgErr("[BASH.SQL:Query()]: %s", query);
+    if !sqlType then
+        MsgErr("[BASH.SQL.Query] -> No SQL type specified for query: %s", query);
         return;
     end
 
@@ -112,117 +115,162 @@ function BASH.SQL:Query(query, sqlType, callback, obj)
     if sqlType == SQL_LOCAL then
         _query = sql.Query(query);
         if _query == false then
-            MsgErr("[BASH.SQL:Query()]: Local SQL query failed!");
-            MsgErr(query);
-            return nil;
+            MsgErr("[BASH.SQL.Query] -> Local SQL query failed! %s", query);
+            return;
         else return _query end;
     elseif sqlType == SQL_GLOBAL then
+        if !self.Connected then
+            MsgErr("[BASH.SQL.Query] -> Global SQL query failed (Not connected to database)! %s", query);
+            return;
+        end
+
         _query = self.DB:Query(query, callback, obj);
+        return _query;
     end
 end
 
-function BASH.SQL:QueryAnalysis(query)
-
-end
-
-function BASH.SQL:NewTable(name, sqlScope, dataScope, origin, struct, primaryKey)
-    if !name or !sqlType or !dataScope then return end;
-    /*
-    **  Origin strings are used in order to keep
-    **  track of what modules are creating what
-    **  SQL tables and to avoid database conflicts.
-    **  (See second if statement.)
-    */
-    if !origin then
-        local args = concatArgs(name, sqlScope, dataScope, origin, struct, primaryKey, multRows);
-        MsgErr("[BASH.SQL:NewTable(%s)]: No origin for new table given!", args);
-        return;
-    end
-    if self.Tables[name] then
-        local args = concatArgs(name, sqlScope, dataScope, origin, struct, primaryKey, multRows);
-        MsgErr("[BASH.SQL:NewTable(%s)]: A table with the name '%s' already exists! Origin: '%s'", args, name, self.Tables[name].Origin);
+function BASH.SQL:AddTable(sqlTab)
+    if !sqlTab or sqlTab.Name then return end;
+    if self.Tables[sqlTab.Name] then
+        MsgErr("[BASH.SQL.AddTable] -> A table with the name '%s' already exists!", sqlTab.Name);
         return;
     end
 
-    local newTable = {};
-    newTable.Struct = {};
-    newTable.PrimaryKey = primaryKey;
-
-    if dataScope == DATA_PLY then
-        newTable.Struct[1] = "`PlayerNum` INT(10) UNSIGNED NOT NULL";
-        newTable.Struct[2] = "`BASHID` TEXT NOT NULL";
-        newTable.PrimaryKey = "PlayerNum";
-    elseif dataScope == DATA_CHAR then
-        newTable.Struct[1] = "`CharNum` INT(10) UNSIGNED NOT NULL";
-        newTable.Struct[2] = "`BASHID` TEXT NOT NULL";
-        newTable.Struct[3] = "`CharID` TEXT NOT NULL";
-        newTable.PrimaryKey = "CharNum";
-    elseif dataScope == DATA_SERVER then
-        newTable.Struct[1] = "`EntryNum` INT(10) UNSIGNED NOT NULL";
-        newTable.PrimaryKey = "EntryNum";
+    sqlTab.Type = sqlTab.Type or SQL_GLOBAL;
+    sqlTab.Scope = sqlTab.Scope or DATA_PLY;
+    //  If the user has supplied a struct, then we assume they know what they're doing.
+    sqlTab.Struct = sqlTab.Struct or {};
+    if !sqlTab.StructOverride then
+        if sqlTab.Scope == DATA_PLY then
+            table.insert(sqlTab.Struct, 1, "`PlayerNum` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT");
+            table.insert(sqlTab.Struct, 2, "`BASHID` TEXT NOT NULL");
+            sqlTab.Key = "PlayerNum";
+        elseif sqlTab.Scope == DATA_CHAR then
+            table.insert(sqlTab.Struct, 1, "`CharNum` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT");
+            table.insert(sqlTab.Struct, 2, "`BASHID` TEXT NOT NULL");
+            table.insert(sqlTab.Struct, 3, "`CharID` TEXT NOT NULL");
+            sqlTab.Key = "CharNum";
+        elseif sqlTab.Scope == DATA_SERVER then
+            table.insert(sqlTab.Struct, 1, "`EntryNum` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT");
+            sqlTab.Key = "EntryNum";
+        end
     end
+    sqlTab.Key = sqlTab.Key or "PlayerNum";
 
-    local index, len = 1, nil;
-    for _, row in pairs(struct) do
-        len = #newTable.Struct;
-        newTable.Struct[len + 1] = struct[index];
-    end
-
-    newTable.SQLScope = sqlScope;
-    newTable.DataScope = dataScope;
-    newTable.Origin = origin;
-
-    self.Tables[name] = newTable;
-    MsgCon(color_sql, true, "Table registered with name '%s'. Origin: '%s'", name, origin);
+    self.Tables[sqlTab.Name] = sqlTab;
+    MsgCon(color_sql, true, "Table registered with name '%s'.", sqlTab.Name);
 end
 
 function BASH.SQL:AddColumn(tableName, colName, colType)
     if !tableName or !colName or !colType then return end;
     if !self.Tables[tableName] then
-        local args = concatArgs(tableName, colName, colType);
-        MsgErr("[BASH.SQL:AddColumn(%s)]: A table with that name doesn't exist!", args);
+        MsgErr("[BASH.SQL.AddColumn] -> A table with the name '%s' doesn't exist!", name);
         return;
     end
     if !SQL_TYPE[colType] then
-        local args = concatArgs(tableName, colName, colType);
-        MsgErr("[BASH.SQL:AddColumn(%s)]: A default SQL structure of that type doesn't exist!", args);
+        MsgErr("[BASH.SQL.AddColumn] -> A default SQL structure of the type '%s' doesn't exist!", colType);
         return;
     end
 
     local len = #self.Tables[tableName].Struct;
     self.Tables[tableName].Struct[len + 1] = '`' .. colName .. '` ' .. SQL_TYPE[colType];
-    MsgCon(color_sql, true, "Appended row '%s' of %s type onto table '%s'.", colName, tableName);
+    MsgCon(color_sql, true, "Appended row '%s' of %s type onto table '%s'.", colName, colType, tableName);
+end
+
+function BASH.SQL:MissingTables(tabs)
+    if !self.Connected then return end;
+
+    // fix this
+
+
+
+    if !name then return end;
+    if !self.Tables[name] then
+        MsgErr("[BASH.SQL.CreateTable] -> Tried to create a non-registered table '%s'!", name);
+        return;
+    end
+
+    local tab = self.Tables[name];
+    local _name = name;
+    local function tableCallback(results)
+        results = results[1];
+        if !results.status then
+            MsgErr("[BASH.SQL.CreateTable] -> Failed to create table with name '%s'! Please fix this before continuing use.", _name);
+            MsgErr(results.error);
+            return;
+        end
+
+        MsgCon(color_sql, true, "'%s' table created successfully in global DB.", _name);
+        if initial then
+            BASH.SQL.GlobalCreateNum = BASH.SQL.GlobalCreateNum - 1;
+            if BASH.SQL.GlobalCreateNum <= 0 then
+                MsgCon(color_sql, true, "All missing tables have been created.");
+                BASH.SQL:ColumnCheck();
+            end
+        end
+    end
+
+    MsgCon(color_sql, true, "Creating missing table '%s'...", name);
+    local query = Format("CREATE TABLE IF NOT EXISTS %s(", name);
+    for index, col in ipairs(tab.Struct) do
+        query = query .. col .. ", ";
+    end
+    query = query .. Format("PRIMARY KEY (`%s`));", tab.Key);
+    local create = self:SQLQuery(query, tab.Type, tableCallback);
+    if tab.Type == SQL_LOCAL then
+        if create == false then
+            MsgErr("[BASH.SQL.CreateTable] -> Failed to create table with name '%s'!", name);
+        else
+            MsgCon(color_sql, true, "'%s' table created successfully in local DB.", name);
+        end
+    end
 end
 
 function BASH.SQL:TableCheck()
     if !self.Connected then return end;
 
-    local received, total = 0, 0;
     local function tableCallback(results)
-        received = received + 1;
         results = results[1];
-
         if !results.status then
-            MsgErr("[BASH.SQL:TableCheck()]: Table query returned an empty set!");
+            MsgErr("[BASH.SQL.TableCheck] -> Global table query returned an error! Please fix this before continuing.");
             MsgErr(results.error);
             return;
         end
 
-        PrintTable(results.data);
+        local tabs = {};
+        for name, tab in pairs(BASH.SQL.Tables) do
+            if !table.HasValue(results.data, name) then
+                table.insert(tabs, name);
+            end
+        end
 
-        if received >= total then
-            MsgN("COLUMN CHECK");
-            //BASH.SQL:ColumnCheck();
+        if #tabs == 0 then
+            MsgCon(color_sql, true, "All global tables accounted for.");
+            BASH.SQL:ColumnCheck();
+        else
+            MsgCon(color_sql, true, "Missing tables from structure. Creating now...");
+            BASH.SQL.GlobalCreateNum = #tabs;
+            for _, tab in pairs(tabs) do
+                BASH.SQL:CreateTable(tab, true);
+            end
         end
     end
 
-    MsgCon(color_sql, true, "Checking tables...");
-    local existsPre, existsQuery = "SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '%s';", nil;
-    for table, structTable in pairs(self.Tables) do
-        existsQuery = Format(existsPre, table);
-        self:SQLQuery(existsQuery, structTable.SQLScope, results);
-        total = total + 1;
+    MsgCon(color_sql, true, "Checking local tables...");
+    local lExists = self:SQLQuery("SHOW TABLES;", SQL_LOCAL);
+    if lExists == false then
+        MsgErr("[BASH.SQL.TableCheck] -> Local table check returned an error!");
+    else
+        for name, sqlTab in pairs(self.Tables) do
+            if sqlTab.Type != SQL_LOCAL then continue end;
+            if !table.HasValue(lExists, name) then
+                self:CreateTable(name);
+            end
+        end
     end
+
+    MsgCon(color_sql, true, "Checking global tables...");
+    local gExists = self:SQLQuery("SHOW TABLES;", SQL_GLOBAL, tableCallback);
 end
 
 function BASH.SQL:ColumnCheck()

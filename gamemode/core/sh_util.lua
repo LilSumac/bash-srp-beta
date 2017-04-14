@@ -1,4 +1,5 @@
 local BASH = BASH;
+BASH.LastLog = BASH.LastLog or 0;
 local net = net;
 local math = math;
 local player = player;

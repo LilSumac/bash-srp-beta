@@ -127,15 +127,6 @@ function BASH.Config:GetGroup(name)
     end
 end
 
-/*
-**  BASH.Config.AddEntry
-**  Args: {Config Structure Table}, "Group Name"
-**
-**  Note: Config is used for storing settings used exclusively
-**  by the server that can be changed by authorized players.
-**  They are saved in a text file on the server in a JSON
-**  format for ease of use/saving.
-*/
 function BASH.Config:AddEntry(confTab, group)
     if !confTab then return end;
     if !group then group = "Unsorted" end;
@@ -194,14 +185,6 @@ function BASH.Config:Load()
     end
 end
 
-function BASH.Config:Save()
-
-end
-
-function BASH.Config:Send(recipients)
-
-end
-
 function BASH.Config:Get(id)
     if !self.IDRef[id] then
         MsgErr("[BASH.Config:Get(%s)]: Tried to fetch a non-existant config entry!", id);
@@ -210,19 +193,60 @@ function BASH.Config:Get(id)
     return self.IDRef[id].Value;
 end
 
-function BASH.Config:Set(id, value)
-    if CLIENT then return end;
-    if !self.IDRef[id] then
-        local args = concatArgs(id, value);
-        MsgErr("[BASH.Config:Set(%s)]: Tried to set a non-existant config entry!", args);
-        return nil;
-    end
-    self.IDRef[id].Value = value;
-end
+if SERVER then
 
-function BASH.Config:Exit()
-    MsgCon(color_green, true, "Saving config...");
-    self:Save();
+    function BASH.Config:Save()
+        BASH:CreateDirectory("bash/config");
+        if !self.InitialSet then return end;
+
+        local fileName, groupCont;
+        for _, groupTab in pairs(self.Groups) do
+            fileName = "bash/config/" .. string.lower(BASH:GetSafeFilename(groupTab.Name));
+
+            groupCont = {};
+            for __, confTab in pairs(groupTab.Entries) do
+                if confTab.Value != nil then
+                    groupCont[confTab.ID] = confTab.Value;
+                end
+            end
+            groupCont = detype(groupCont, "string");
+
+            if !file.Exists(fileName, "DATA") then
+                BASH:CreateFile(fileName);
+            end
+
+            BASH:WriteToFile(fileName, groupCont, true);
+        end
+    end
+
+    function BASH.Config:Send(recipients)
+        if !self.InitialSet then return end;
+
+        local idCont = {};
+        for id, confTab in pairs(self.IDRef) do
+            idCont[id] = confTab.Value;
+        end
+
+        local packet = vnet.CreatePacket("BASH_CONFIG_GET");
+        packet:Table(idCont);
+        packet:AddTargets(recipients);
+        packet:Send();
+    end
+
+    function BASH.Config:Set(id, value)
+        if !self.IDRef[id] then
+            local args = concatArgs(id, value);
+            MsgErr("[BASH.Config:Set(%s)]: Tried to set a non-existant config entry!", args);
+            return nil;
+        end
+        self.IDRef[id].Value = value;
+    end
+
+    function BASH.Config:Exit()
+        MsgCon(color_green, true, "Saving config...");
+        self:Save();
+    end
+
 end
 
 if CLIENT then
@@ -234,15 +258,25 @@ if CLIENT then
         BASH.IntroStage = 2;
     end);
 
-    net.Receive("BASH_CONFIG_SET", function(len)
-        BASH.ConfigSet = net.ReadBool();
+    net.Receive("BASH_CONFIG_ISSET", function(len)
+        BASH.InitialSet = net.ReadBool();
     end);
+
+    vnet.Watch("BASH_CONFIG_GET", function(data)
+        local entries = data:Table();
+        for id, confTab in pairs(BASH.Config.IDRef) do
+            if entries[id] != nil then
+                confTab.Value = entries[id];
+            end
+        end
+    end);
+
 elseif SERVER then
     /*
     **  Misc. Hooks
     */
     hook.Add("PostEntInitialize", "BASH_SetInitialConfig", function(ply)
-        net.Start("BASH_CONFIG_SET");
+        net.Start("BASH_CONFIG_ISSET");
             net.WriteBool(BASH.Config.InitialSet);
         net.Send(ply);
 
@@ -256,10 +290,11 @@ elseif SERVER then
     */
     util.AddNetworkString("BASH_CONFIG_INIT");
     util.AddNetworkString("BASH_CONFIG_INIT_CANCEL");
+    util.AddNetworkString("BASH_CONFIG_ISSET");
+    util.AddNetworkString("BASH_CONFIG_GET");
     util.AddNetworkString("BASH_CONFIG_SET");
-    util.AddNetworkString("BASH_CONFIG_SET_ENTRY");
 
-    vnet.Watch("BASH_CONFIG_SET_ENTRY", function(data)
+    vnet.Watch("BASH_CONFIG_SET", function(data)
         local ply = data.Source;
         local entry = data:Table();
 
@@ -281,6 +316,7 @@ elseif SERVER then
         ply.SettingConfig = false;
         BASH.Config.SettingUp = false;
     end);
+    
 end
 
 BASH:RegisterLib(BASH.Config);
