@@ -46,6 +46,8 @@ DATA_PLY = 1;
 DATA_CHAR = 2;
 DATA_SERVER = 3;
 
+Fmt = Format;
+
 LOG_ALL = 1;
 LOG_ERR = 2;
 LOG_IC = 3;
@@ -83,7 +85,7 @@ SQL_GLOBAL = 2;
 
 if CLIENT then
     LP = LocalPlayer;
-    
+
 	SCRW = ScrW();
 	SCRH = ScrH();
 	CENTER_X = SCRW / 2;

@@ -4,9 +4,6 @@ BASH.SQL.Name = "SQL";
 BASH.SQL.DB = BASH.SQL.DB or nil;
 BASH.SQL.Connected = BASH.SQL.Connected or false;
 BASH.SQL.Tables = BASH.SQL.Tables or {};
-BASH.SQL.TablesFixed = BASH.SQL.TablesFixed or false;
-BASH.SQL.TablesMissing = BASH.SQL.TablesMissing or {};
-BASH.SQL.GlobalCreateNum = BASH.SQL.GlobalCreateNum or 0;
 BASH.SQL.ServerData = BASH.SQL.ServerData or {};
 local Player = FindMetaTable("Player");
 
@@ -103,6 +100,12 @@ function BASH.SQL:Init()
         MsgCon(color_sql, "Database connected successfully!");
         self.Connected = true;
         self:TableCheck();
+        timer.Simple(0.5, function()
+            BASH.SQL:ColumnCheck();
+        end);
+        timer.Simple(1, function()
+            self:GatherServerData();
+        end);
     end
 end
 
@@ -179,113 +182,65 @@ function BASH.SQL:AddColumn(tableName, colName, colType)
     MsgCon(color_sql, true, "Appended row '%s' of %s type onto table '%s'.", colName, colType, tableName);
 end
 
-function BASH.SQL:MissingTables(tabs)
-    if !self.Connected then return end;
-
-    // fix this
-
-
-
-    if !name then return end;
-    if !self.Tables[name] then
-        MsgErr("[BASH.SQL.CreateTable] -> Tried to create a non-registered table '%s'!", name);
-        return;
-    end
-
-    local tab = self.Tables[name];
-    local _name = name;
-    local function tableCallback(results)
-        results = results[1];
-        if !results.status then
-            MsgErr("[BASH.SQL.CreateTable] -> Failed to create table with name '%s'! Please fix this before continuing use.", _name);
-            MsgErr(results.error);
-            return;
-        end
-
-        MsgCon(color_sql, true, "'%s' table created successfully in global DB.", _name);
-        if initial then
-            BASH.SQL.GlobalCreateNum = BASH.SQL.GlobalCreateNum - 1;
-            if BASH.SQL.GlobalCreateNum <= 0 then
-                MsgCon(color_sql, true, "All missing tables have been created.");
-                BASH.SQL:ColumnCheck();
-            end
-        end
-    end
-
-    MsgCon(color_sql, true, "Creating missing table '%s'...", name);
-    local query = Format("CREATE TABLE IF NOT EXISTS %s(", name);
-    for index, col in ipairs(tab.Struct) do
-        query = query .. col .. ", ";
-    end
-    query = query .. Format("PRIMARY KEY (`%s`));", tab.Key);
-    local create = self:SQLQuery(query, tab.Type, tableCallback);
-    if tab.Type == SQL_LOCAL then
-        if create == false then
-            MsgErr("[BASH.SQL.CreateTable] -> Failed to create table with name '%s'!", name);
-        else
-            MsgCon(color_sql, true, "'%s' table created successfully in local DB.", name);
-        end
-    end
-end
-
 function BASH.SQL:TableCheck()
     if !self.Connected then return end;
 
-    self.TablesFixed = false;
+    local globalQuery = "";
+    local localQuery = "";
+    for name, sqlTab in pairs(self.Tables) do
+        if sqlTab.Type == SQL_GLOBAL then
+            globalQuery = globalQuery .. Fmt("CREATE TABLE IF NOT EXISTS '%s'(", name);
+            for index, col in pairs(sqlTab.Struct) do
+                globalQuery = globalQuery .. col .. ", ";
+            end
+            globalQuery = globalQuery .. Fmt("PRIMARY KEY('%s')); ", sqlTab.Key);
+        elseif sqlTab.Type == SQL_LOCAL then
+            localQuery = localQuery .. Fmt("CREATE TABLE IF NOT EXISTS '%s'(", name);
+            for index, col in pairs(sqlTab.Struct) do
+                localQuery = localQuery .. col .. ", ";
+            end
+            localQuery = localQuery .. Fmt("PRIMARY KEY('%s')); ", sqlTab.Key);
+        end
+    end
+
+    MsgCon(color_sql, true, "Creating missing tables in local DB...");
+    local lCreate = self:Query(localQuery, SQL_LOCAL);
+    if lCreate == false then
+        MsgErr("[BASH.SQL.TableCheck] -> Local table check returned an error!");
+    else
+        MsgCon(color_sql, true, "Missing tables were created in local DB.");
+    end
 
     local function tableCallback(results)
         results = results[1];
         if !results.status then
-            MsgErr("[BASH.SQL.TableCheck] -> Global table query returned an error! Please fix this before continuing.");
+            MsgErr("[BASH.SQL.TableCheck] -> Global table query returned an error!");
             MsgErr(results.error);
             return;
         end
 
-        local tabs = {};
-        for name, tab in pairs(BASH.SQL.Tables) do
-            if !table.HasValue(results.data, name) then
-                table.insert(tabs, name);
-            end
-        end
-
-        if #tabs == 0 then
-            MsgCon(color_sql, true, "All global tables accounted for.");
-            BASH.SQL:ColumnCheck();
-        else
-            MsgCon(color_sql, true, "Missing tables from structure. Creating now...");
-            BASH.SQL:MissingTables(tabs, SQL_GLOBAL);
-        end
+        MsgCon(color_sql, true, "Missing tables were created in global DB.");
     end
 
-    MsgCon(color_sql, true, "Checking local tables...");
-    local lExists = self:SQLQuery("SHOW TABLES;", SQL_LOCAL);
-    if lExists == false then
-        MsgErr("[BASH.SQL.TableCheck] -> Local table check returned an error!");
-    else
-        local tabs = {};
-        for name, sqlTab in pairs(self.Tables) do
-            if sqlTab.Type != SQL_LOCAL then continue end;
-            if !table.HasValue(lExists, name) then
-                table.insert(tabs, name);
-            end
-        end
-
-        if #tabs == 0 then
-            MsgCon(color_sql, true, "All local tables accounted for.");
-    end
-
-    MsgCon(color_sql, true, "Checking global tables...");
-    local gExists = self:SQLQuery("SHOW TABLES;", SQL_GLOBAL, tableCallback);
+    MsgCon(color_sql, true, "Creating missing tables in global DB...");
+    local gCreate = self:Query(globalQuery, SQL_GLOBAL);
 end
 
 function BASH.SQL:ColumnCheck()
     if !self.Connecteds then return end;
 
+    local lCreate = self:Query("SELECT TABLE_NAME, COLUMN_NAME, FROM INFORMATION_SCHEMA.COLUMNS;", SQL_LOCAL);
+    if lCreate == false then
+        MsgErr("[BASH.SQL.ColumnCheck] -> Local column check returned an error!");
+    else
+        // continue here
+    end
+
     //optimize this
     local create = {};
     local columns, varName, exists, createStr;
     for table, structTable in pairs(self.Tables) do
-        columns = self:Query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = \'" .. table .. "\';", structTable.SQLScope);
+        columns = self:Query("SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS;", structTable.SQLScope);
         if !columns then
             MsgErr("[BASH.SQL:ColumnCheck()]: Column query returned an empty set!");
             continue;
@@ -330,6 +285,10 @@ function BASH.SQL:ColumnCheck()
     end
 
     self:ColumnCleanup();
+end
+
+function BASH.SQL:ColumnCreate()
+
 end
 
 function BASH.SQL:ColumnCleanup()
