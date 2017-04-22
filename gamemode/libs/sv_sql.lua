@@ -4,6 +4,8 @@ BASH.SQL.Name = "SQL";
 BASH.SQL.DB = BASH.SQL.DB or nil;
 BASH.SQL.Connected = BASH.SQL.Connected or false;
 BASH.SQL.Tables = BASH.SQL.Tables or {};
+BASH.SQL.TablesFixed = BASH.SQL.TablesFixed or false;
+BASH.SQL.TablesMissing = BASH.SQL.TablesMissing or {};
 BASH.SQL.GlobalCreateNum = BASH.SQL.GlobalCreateNum or 0;
 BASH.SQL.ServerData = BASH.SQL.ServerData or {};
 local Player = FindMetaTable("Player");
@@ -229,6 +231,8 @@ end
 function BASH.SQL:TableCheck()
     if !self.Connected then return end;
 
+    self.TablesFixed = false;
+
     local function tableCallback(results)
         results = results[1];
         if !results.status then
@@ -249,10 +253,7 @@ function BASH.SQL:TableCheck()
             BASH.SQL:ColumnCheck();
         else
             MsgCon(color_sql, true, "Missing tables from structure. Creating now...");
-            BASH.SQL.GlobalCreateNum = #tabs;
-            for _, tab in pairs(tabs) do
-                BASH.SQL:CreateTable(tab, true);
-            end
+            BASH.SQL:MissingTables(tabs, SQL_GLOBAL);
         end
     end
 
@@ -261,12 +262,16 @@ function BASH.SQL:TableCheck()
     if lExists == false then
         MsgErr("[BASH.SQL.TableCheck] -> Local table check returned an error!");
     else
+        local tabs = {};
         for name, sqlTab in pairs(self.Tables) do
             if sqlTab.Type != SQL_LOCAL then continue end;
             if !table.HasValue(lExists, name) then
-                self:CreateTable(name);
+                table.insert(tabs, name);
             end
         end
+
+        if #tabs == 0 then
+            MsgCon(color_sql, true, "All local tables accounted for.");
     end
 
     MsgCon(color_sql, true, "Checking global tables...");
@@ -274,8 +279,9 @@ function BASH.SQL:TableCheck()
 end
 
 function BASH.SQL:ColumnCheck()
-    if !self.Connected then return end;
+    if !self.Connecteds then return end;
 
+    //optimize this
     local create = {};
     local columns, varName, exists, createStr;
     for table, structTable in pairs(self.Tables) do
