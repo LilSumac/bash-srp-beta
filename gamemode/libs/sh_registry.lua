@@ -179,7 +179,6 @@ elseif SERVER then
             BASH.Registry.Queue:enqueue(steamID);
         end
 
-    	self.SQLData = data;
     	self:PushData();
     	self:PullData();
 
@@ -189,14 +188,7 @@ elseif SERVER then
     	BASH.LastRegistered = steamID;
     end
     hook.Add("Think", "BASH_HandleRegistryQueue", function()
-        //  MOVE THE QUEUE TO SQL
-        //  MOVE THE QUEUE TO SQL
-        //  MOVE THE QUEUE TO SQL
-        //  MOVE THE QUEUE TO SQL
-        //  MOVE THE QUEUE TO SQL
-        if !BASH.Registry.Queue then
-            BASH.Registry.Queue = Queue:Create();
-        end
+        if !BASH.Registry.Queue then return end;
         if !BASH.Registry.Queue:first() then return end;
         if BASH.LastRegistered == BASH.Registry.Queue:first() then
             //  Get rid of the finished player.
@@ -204,21 +196,24 @@ elseif SERVER then
 
             local nextID = BASH.Registry.Queue:dequeue();
     		local ply = player.GetBySteamID(nextID);
-    		if CheckPly(ply) and ply.SQLData then
-    			ply:Register(ply.SQLData);
+    		if CheckPly(ply) and !ply.SQLData then
+    			ply:SQLInit();
     		end
 
-    		if BASH.Registry.Queue:len() > 1 then
+    		if BASH.Registry.Queue:len() >= 1 then
+                local targets = {};
+                local places = {};
     			for index, id in pairs(BASH.Registry.Queue:elem()) do
-                    if index == 1 then continue end;
     				local ply = player.GetBySteamID(id);
     				if CheckPly(ply) then
-                        local queuePacket = vnet.CreatePacket("BASH_REGISTRY_QUEUED");
-                        queuePacket:Byte(index);
-                        queuePacket:AddTargets(ply);
-                        queuePacket:Send();
+                        targets[#targets + 1] = ply;
+                        places[id] = index;
     				end
     			end
+                local queuePacket = vnet.CreatePacket("BASH_REGISTRY_QUEUED");
+                queuePacket:Table(places);
+                queuePacket:AddTargets(targets);
+                queuePacket:Send();
     		end
     	end
     end);
@@ -272,14 +267,17 @@ if CLIENT then
         BASH.IntroStage = 2;
     end);
 
-    /*
     vnet.Watch("BASH_REGISTRY_PROGRESS", function(data)
-        LocalPlayer().RegistryProgress = data:Byte();
+        local progress = data:String();
+        MsgCon(color_sql, true, progress);
+        // set data:String() to current message
     end);
-    */
 
     vnet.Watch("BASH_REGISTRY_QUEUED", function(data)
-        LP().QueuePlace = data:Byte();
+        local places = data:Table();
+        local place = places[LP():SteamID()] or -1;
+        MsgCon(color_sql, true, "You're in position %n for the registry queue.", place);
+        LP().QueuePlace = place;
     end);
 
     vnet.Watch("BASH_UPDATE_VAR", function(data)

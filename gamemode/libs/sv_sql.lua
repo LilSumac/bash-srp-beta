@@ -5,6 +5,7 @@ BASH.SQL.DB = BASH.SQL.DB or nil;
 BASH.SQL.Connected = BASH.SQL.Connected or false;
 BASH.SQL.Tables = BASH.SQL.Tables or {};
 BASH.SQL.ServerData = BASH.SQL.ServerData or {};
+BASH.SQL.Dependencies = {["Registry"] = SERVER};
 local Player = FindMetaTable("Player");
 
 /*  Movin on.
@@ -370,7 +371,26 @@ function Player:SQLInit()
     if !BASH.SQL.Connected then return end;
     if !CheckPly(self) then return end;
 
-    self.SQLData = {};
+    local steamID = self:SteamID();
+    self.SQLData = nil;
+
+    if !BASH.Registry.Queue then
+        BASH.Registry.Queue = Queue:Create();
+    end
+
+    local nextPos = BASH.Registry.Queue:first();
+    if nextPost and nextPos != steamID then
+        BASH.Registry.Queue:enqueue(steamID);
+        local queuePack = vnet.CreatePacket("BASH_REGISTRY_QUEUED");
+        queuePack:Table({[steamID] = BASH.Registry.Queue:len()});
+        queuePack:AddTargets(self);
+        queuePack:Send();
+        return;
+    elseif !nextPos then
+        BASH.Registry.Queue:enqueue(steamID);
+        vnet.SendString("BASH_REGISTRY_PROGRESS", "Starting SQL process...");
+    end
+
     local _self = self;
     local function existsCallback(results)
         results = results[1];
@@ -389,7 +409,7 @@ function Player:SQLInit()
         end
     end
 
-    local _sql, steamID = BASH.SQL, self:SteamID();
+    local _sql = BASH.SQL;
     _sql:Query(Fmt("SELECT * FROM bash_players WHERE SteamID = '%s';", steamID), SQL_GLOBAL, existsCallback);
 end
 
@@ -418,6 +438,7 @@ function Player:SQLCreate()
 
     local _sql = BASH.SQL;
     MsgCon(color_sql, true, "Creating a new player entry for %s (%s).", steamName, steamID);
+    vnet.SendString("BASH_REGISTRY_PROGRESS", "Creating a new database entry for you...", self);
     local query = Fmt(
         "INSERT INTO bash_players(SteamName, SteamID, PlayerFlags) VALUES('%s', '%s', '');",
         steamName, steamID
