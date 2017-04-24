@@ -116,6 +116,7 @@ function BASH.SQL:Query(query, sqlType, callback, obj)
         return;
     end
 
+    query = sql.SQLStr(query, true);
     local _query;
     if sqlType == SQL_LOCAL then
         _query = sql.Query(query);
@@ -148,11 +149,11 @@ function BASH.SQL:AddTable(sqlTab)
     if !sqlTab.StructOverride then
         if sqlTab.Scope == DATA_PLY then
             table.insert(sqlTab.Struct, 1, "`PlayerNum` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT");
-            table.insert(sqlTab.Struct, 2, "`BASHID` TEXT NOT NULL");
+            table.insert(sqlTab.Struct, 2, "`SteamID` TEXT NOT NULL");
             sqlTab.Key = "PlayerNum";
         elseif sqlTab.Scope == DATA_CHAR then
             table.insert(sqlTab.Struct, 1, "`CharNum` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT");
-            table.insert(sqlTab.Struct, 2, "`BASHID` TEXT NOT NULL");
+            table.insert(sqlTab.Struct, 2, "`SteamID` TEXT NOT NULL");
             table.insert(sqlTab.Struct, 3, "`CharID` TEXT NOT NULL");
             sqlTab.Key = "CharNum";
         elseif sqlTab.Scope == DATA_SERVER then
@@ -369,43 +370,97 @@ function Player:SQLInit()
     if !BASH.SQL.Connected then return end;
     if !CheckPly(self) then return end;
 
-    local sql, steamID, data = BASH.SQL, self:SteamID(), {};
-    local exists = sql:Query("SELECT * FROM bash_players WHERE SteamID = \'" .. steamID .. "\';");
-    if !exists[1] then
-        local bashID, steamName = BASH:RandomString(16), self:Name();
-        local args = concatArgs(bashID, steamName, steamID, "");
-        local insert = sql:Query("INSERT INTO bash_players(BASHID, SteamName, SteamID, PlayerFlags) VALUES(" .. args .. ");");
-        if insert != false then
-            MsgCon(color_sql, true, "New row created for player %s.", steamName);
-
-            data["bash_players"] = {
-                ["BASHID"] = bashID,
-                ["SteamName"] = steamName,
-                ["SteamID"] = steamID,
-                ["PlayerFlags"] = "[]"
-            };
+    self.SQLData = {};
+    local _self = self;
+    local function existsCallback(results)
+        results = results[1];
+        if !results.status then
+            MsgErr("[Player.SQLInit] -> Player SQL existance check returned an error! They're stuck in limbo!");
+            MsgErr(results.error);
+            // do some error posting here
+            return;
         end
-    else
-        MsgCon(color_sql, true, "Row found for player %s.", self:Name());
-        data["bash_players"] = exists[1];
+
+        if table.IsEmpty(results.data) then
+            _self:SQLCreate();
+        else
+            _self.SQLData["bash_players"] = results.data;
+            _self:SQLGather();
+        end
     end
 
-    local tableQuery;
-    for table, tableStruct in pairs(BASH.SQL.Tables) do
-        if table == "bash_players" then continue end;
-        if tableStruct.DataScope != DATA_SERVER then
-            tableQuery = sql:Query("SELECT * FROM " .. table .. " WHERE BASHID = " .. concatArgs(bashID) .. ";");
-            if tableQuery then
-                if #tableQuery > 1 then
-                    data[table] = tableQuery;
-                else
-                    data[table] = tableQuery[1];
-                end
+    local _sql, steamID = BASH.SQL, self:SteamID();
+    _sql:Query(Fmt("SELECT * FROM bash_players WHERE SteamID = '%s';", steamID), SQL_GLOBAL, existsCallback);
+end
+
+function Player:SQLCreate()
+    if !BASH.SQL.Connected then return end;
+    if !CheckPly(self) then return end;
+
+    local steamName, steamID = self:Name(), self:SteamID();
+    local _self = self;
+    local function createCallback(results)
+        results = results[1];
+        if !results.status then
+            MsgErr("[Player.SQLInit] -> Player SQL creation returned an error! They're stuck in limbo!");
+            MsgErr(results.error);
+            // do some error posting here
+            return;
+        end
+
+        _self.SQLData["bash_players"] = {
+            ["SteamName"] = steamName,
+            ["SteamID"] = steamID,
+            ["PlayerFlags"] = ""
+        };
+        _self:SQLGather();
+    end
+
+    local _sql = BASH.SQL;
+    MsgCon(color_sql, true, "Creating a new player entry for %s (%s).", steamName, steamID);
+    local query = Fmt(
+        "INSERT INTO bash_players(SteamName, SteamID, PlayerFlags) VALUES('%s', '%s', '');",
+        steamName, steamID
+    );
+    _sql:Query(query, SQL_GLOBAL, createCallback);
+end
+
+function Player:SQLGather()
+    if !BASH.SQL.Connected then return end;
+    if !CheckPly(self) then return end;
+
+    local tabOrder, index = {}, 1;
+    for name, sqlTab in pairs(BASH.SQL.Tables) do
+        if name == "bash_players" then continue end;
+        if sqlTab.Scope != DATA_SERVER then
+            tabOrder[index] = name;
+            index = index + 1;
+        end
+    end
+
+    local _self = self;
+    local function gatherCallback(resultsTab)
+        for queryNum, results in pairs(resultsTab) do
+            if !results.status then
+                MsgErr("[Player.SQLGather] -> One of the player SQL gathers returned an error!");
+                MsgErr(results.error);
+                // do some error posting here
+                continue;
             end
+
+            _self.SQLData[tabOrder[queryNum]] = results.data;
         end
+
+        self:Register();
     end
 
-    self:Register(data);
+    local _sql = BASH.SQL;
+    MsgCon(color_sql, true, "Gathering existing data for %s (%s).", steamName, steamID);
+    local query = "";
+    for index, name in ipairs(tabOrder) do
+        query = query .. Fmt("SELECT * FROM %s WHERE SteamID = '%s'; ", name, steamID);
+    end
+    _sql:Query(query, SQL_GLOBAL, gatherCallback);
 end
 
 concommand.Add("bash_nopush", function(ply, cmd, args)

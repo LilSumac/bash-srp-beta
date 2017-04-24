@@ -109,6 +109,28 @@ function string.wrap(str, font, size)
 	return endstr, n;
 end
 
+function string.random(length)
+	local randStr = "";
+	for index = 1, length do
+		randStr = randStr .. CHARACTERS_RANDOM[math.random(1, #CHARACTERS_RANDOM)];
+	end
+	return randStr;
+end
+
+function string.SecondsToTime(secs, daytime)
+	local hours = math.floor(secs / 3600);
+	local minutes = math.floor((secs - (hours * 3600)) / 60);
+	local seconds = secs - (hours * 3600) - (minutes * 60);
+
+	if hours < 10 then hours = "0" .. tostring(hours) end;
+	if minutes < 10 then minutes = "0" .. tostring(minutes) end;
+	if seconds < 10 then seconds = "0" .. tostring(seconds) end;
+	if daytime then
+		hours = hours % 24;
+	end
+	return Format("%d:%d:%d", hours, minutes, seconds);
+end
+
 /*
 **  'table' Library Functions
 */
@@ -195,29 +217,6 @@ function concatArgs(...)
 
     if #items > 1 then str = string.sub(str, 1, #str - 2) end;
     return str;
-end
-
-local randStr;
-function randomString(length)
-	randStr = "";
-	for index = 1, length do
-		randStr = randStr .. CHARACTERS_RANDOM[math.random(1, #CHARACTERS_RANDOM)];
-	end
-	return randStr;
-end
-
-function secondsToTime(secs, daytime)
-	local hours = math.floor(secs / 3600);
-	local minutes = math.floor((secs - (hours * 3600)) / 60);
-	local seconds = secs - (hours * 3600) - (minutes * 60);
-
-	if hours < 10 then hours = "0" .. tostring(hours) end;
-	if minutes < 10 then minutes = "0" .. tostring(minutes) end;
-	if seconds < 10 then seconds = "0" .. tostring(seconds) end;
-	if daytime then
-		hours = hours % 24;
-	end
-	return Format("%d:%d:%d", hours, minutes, seconds);
 end
 
 function BASH:IncludeFile(name, print)
