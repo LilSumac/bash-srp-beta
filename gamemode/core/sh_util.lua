@@ -4,6 +4,18 @@ local net = net;
 local math = math;
 local player = player;
 local string = string;
+local table = table;
+
+/*
+**  'math' Library Functions
+*/
+function math.lerp(frac, from, to)
+    local val = Lerp(frac, from, to);
+    if (to / math.abs(val - to)) < frac then
+        val = to;
+    end
+    return val;
+end
 
 /*
 **  'net' Library Functions
@@ -25,17 +37,6 @@ function net.Empty(id, recip)
         end
         net.Send(recip);
     end
-end
-
-/*
-**  'math' Library Functions
-*/
-function math.lerp(frac, from, to)
-    local val = Lerp(frac, from, to);
-    if (to / math.abs(val - to)) < frac then
-        val = to;
-    end
-    return val;
 end
 
 /*
@@ -106,6 +107,15 @@ function string.wrap(str, font, size)
 	end
 
 	return endstr, n;
+end
+
+/*
+**  'table' Library Functions
+*/
+function table.IsEmpty(tab)
+    if !tab or type(tab) != "table" then return true end;
+    for _, __ in pairs(tab) do return false end;
+    return true;
 end
 
 /*

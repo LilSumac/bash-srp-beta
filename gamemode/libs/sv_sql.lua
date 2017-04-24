@@ -227,15 +227,16 @@ function BASH.SQL:TableCheck()
 end
 
 function BASH.SQL:ColumnCheck()
-    if !self.Connecteds then return end;
+    if !self.Connected then return end;
 
-    local lCreate = self:Query("SELECT TABLE_NAME, COLUMN_NAME, FROM INFORMATION_SCHEMA.COLUMNS;", SQL_LOCAL);
+    local lCreate = self:Query("SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS;", SQL_LOCAL);
     if lCreate == false then
         MsgErr("[BASH.SQL.ColumnCheck] -> Local column check returned an error!");
     else
-        // continue here
+        PrintTable(lCreate);
     end
 
+    /*
     //optimize this
     local create = {};
     local columns, varName, exists, createStr;
@@ -285,6 +286,7 @@ function BASH.SQL:ColumnCheck()
     end
 
     self:ColumnCleanup();
+    */
 end
 
 function BASH.SQL:ColumnCreate()

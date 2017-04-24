@@ -14,7 +14,7 @@ function BASH.Registry:Init()
     **  Create Default Variables
     */
 
-    BASH.Registry:NewVariable{
+    BASH.Registry:AddVariable{
         Name = "BASHID",
         Type = "string",
         Default = "BASH_ID",
@@ -22,7 +22,7 @@ function BASH.Registry:Init()
         SQLTable = "bash_players"
     };
 
-    BASH.Registry:NewVariable{
+    BASH.Registry:AddVariable{
         Name = "SteamID",
         Type = "string",
         Default = "STEAM_ID",
@@ -34,7 +34,7 @@ function BASH.Registry:Init()
 end
 
 /*
-**  BASH.Registry.NewVariable
+**  BASH.Registry.AddVariable
 **  Args: Variable Table Structure
 **
 **  Note: 'boolean' type variables must be registered with a
@@ -49,18 +49,12 @@ end
 **  value a home table, i.e. the SQL table in which this
 **  variable is saved in.
 */
-function BASH.Registry:NewVariable(var)
+function BASH.Registry:AddVariable(var)
     if !var.Name then return end;
-    if SERVER and var.SQLTable then
-        if !BASH.SQL.Tables[var.SQLTable] then
-            MsgErr("[BASH.Registry:NewVariable(%s)]: This variable points to the SQL table '%s', which doesn't exist!", var.Name, var.SQLTable);
-            return;
-        end
-    end
 
     self.Vars = self.Vars or {};
     if self.Vars[var.Name] then
-        MsgErr("[BASH.Registry:NewVariable(%s)]: A variable with that name already exists!", var.Name);
+        MsgErr("[BASH.Registry.AddVariable] -> A variable with the name '%s' already exists!", var.Name);
         return;
     end
 
@@ -74,7 +68,7 @@ function BASH.Registry:NewVariable(var)
     Player["Get" .. var.Name] = function(_self)
         if !checkply(_self) then return end;
         if !self.Players[_self:SteamID()] then
-            MsgErr("[Player:Get%s()]: %s not registered! (%s)", var.Name, (CLIENT and "You're") or _self:Nick(), _self:SteamID());
+            MsgErr("[Player.Get%s] -> %s not registered! (%s)", var.Name, (CLIENT and "You're") or _self:Nick(), _self:SteamID());
             return;
         end
 
@@ -87,34 +81,22 @@ function BASH.Registry:NewVariable(var)
 
             local steamID = _self:SteamID();
             if !self.Players[steamID] then
-                MsgErr("[Player:Set%s(...)]: Player not registered! (%s/%s)", var.Name, _self:Nick(), steamID);
+                MsgErr("[Player.Set%s] -> Player not registered! (%s/%s)", var.Name, _self:Nick(), steamID);
                 return;
             end
 
             val = detype(val, var.Type);
             self.Players[steamID][var.Name] = val;
 
+            local packetString = {[steamID] = {[var.Name] = val}};
+            packetString = von.serialize(packetString);
+            local targets;
             if var.Public then
-                self.VarBuffer = self.VarBuffer or {};
-                self.VarBuffer[steamID] = self.VarBuffer[steamID] or {};
-                self.VarBuffer[steamID][var.Name] = val;
-                self.LastVarUpdate = SysTime();
+                targets = player.GetAll();
             else
-                _self.VarBuffer = _self.VarBuffer or {};
-                _self.VarBuffer[var.Name] = val;
-                _self.LastVarUpdate = SysTime();
+                targets = _self;
             end
-        end
-
-        if var.SQLTable then
-            if BASH.SQL.ColumnsConsolidated then
-                local args = detype(var, "string");
-                MsgErr("[BASH.Registry:NewVariable(%s)]: The database structure has already been consolidated! You must call this function earlier in order for this variable to be saved to the entered table.", args);
-                return;
-            end
-
-            local index = #BASH.SQL.Tables[var.SQLTable].Struct + 1;
-            BASH.SQL.Tables[var.SQLTable].Struct[index] = Format("`%s` %s %s", var.Name, SQL_TYPE[var.Type], ((var.Default != "" and " DEFAULT \'" .. var.Default .. "\'") or ""));
+            vnet.SendString("BASH_UPDATE_VAR", packetString, targets);
         end
     end
 end
@@ -130,52 +112,48 @@ function Player:GetVars(vars)
     return unpack(vals);
 end
 
-function Player:SetVars(vars, vals)
-    if !vars or #vars == 0 then return end;
-    vals = vals or {};
+function Player:SetVars(vars)
+    if !checkply(self) then return end;
+    if !varTab or table.IsEmpty(varTab) then return end;
 
-    for index, var in ipairs(vars) do
-        self["Set" .. var](self, vals[index]);
+    local steamID = self:SteamID();
+    if !BASH.Registry.Players[steamID] then
+        MsgErr("[Player.Set%s]: Player not registered! (%s/%s)", var.Name, self:Nick(), steamID);
+        return;
+    end
+
+    local varTab, val;
+    local pubString, privString = {[steamID] = {}}, {[steamID] = {}};
+    for var, val in pairs(vars) do
+        varTab = BASH.Registry.Vars[var];
+        if !varTab then
+            MsgErr("[Player.SetVars] -> No variable found under name '%s'!", var);
+            continue;
+        end
+        //CONTINUE HERE
+        val = detype(val, varTab.Type);
+        BASH.Registry.Players[steamID][varTab.Name] = val;
+
+        if varTab.Public then
+            pubString[steamID][var.Name] = val;
+        else
+            privString[steamID][var.Name] = val;
+        end
+    end
+
+    if !table.IsEmpty(pubString[steamID]) then
+        pubString = von.serialize(pubString);
+        vnet.SendString("BASH_UPDATE_VAR", pubString, player.GetAll());
+    end
+    if !table.IsEmpty(privString[steamID]) then
+        privString = von.serialize(privString);
+        vnet.SendString("BASH_UPDATE_VAR", privString, self);
     end
 end
 
 if SERVER then
 
-    hook.Add("Think", "BASH_HandleVarUpdateQueue", function()
-        BASH.Registry.VarBuffer = BASH.Registry.VarBuffer or {};
-        BASH.Registry.LastVarUpdate = BASH.Registry.LastVarUpdate or 0;
-        if table.Count(BASH.Registry.VarBuffer) > 0 and SysTime() - BASH.Registry.LastVarUpdate > 0.5 then
-            local ply;
-            for steamID, varTab in pairs(BASH.Registry.VarBuffer) do
-                ply = player.GetBySteamID(steamID);
-                if !checkply(ply) then
-                    BASH.Registry.VarBuffer[steamID] = nil;
-                end
-            end
-
-            local broadcastPacket = vnet.CreatePacket("BASH_UPDATE_VAR");
-            broadcastPacket:Table(BASH.Registry.VarBuffer);
-            broadcastPacket:AddTargets(player.GetAll());
-            broadcastPacket:Send();
-            BASH.Registry.VarBuffer = {};
-        end
-
-        local steamID, curTab, curPacket;
-        for _, ply in pairs(player.GetAll()) do
-            if !ply.VarBuffer or table.Count(ply.VarBuffer) == 0 then continue end;
-
-            ply.LastVarUpdate = ply.LastVarUpdate or 0;
-            if SysTime() - ply.LastVarUpdate < 0.5 then continue end;
-
-            steamID = ply:SteamID();
-            for var, val in pairs(ply.VarBuffer) do
-                BASH.Registry.VarBuffer[steamID][var] = val;
-            end
-            ply.VarBuffer = {};
-        end
-    end);
-
-    function Player:Register(data, queued)
+    function Player:Register(data)
         if !checkply(self) then return end;
         if !BASH.Registry.Vars then return end;
 
@@ -243,13 +221,14 @@ if SERVER then
     function Player:PushData()
         MsgCon(color_green, false, "[PUSH] %s", self:Name());
 
-    	for table, tableData in pairs(self.SQLData) do
-    		for name, var in pairs(BASH.Registry.Vars) do
-    			if tableData[name] and var.SQLTable == table then
-    	        	self["Set" .. name](self, (tableData[name] == nil and !isbool(var.Default) and var.Default) or tableData[name]);
-    			end
-    	    end
-    	end
+        self.SQLDATA
+        local index, vars, vals = 1;
+		for name, var in pairs(BASH.Registry.Vars) do
+			if self.SQLData[name] then
+                vars[index] =
+	        	self["Set" .. name](self, (tableData[name] == nil and !isbool(var.Default) and var.Default) or tableData[name]);
+			end
+	    end
     end
 
     //  Pull From Players
@@ -305,7 +284,8 @@ if CLIENT then
     end);
 
     vnet.Watch("BASH_UPDATE_VAR", function(data)
-        local vars = data:Table();
+        local vars = data:String();
+        vars = von.deserialize(vars);
         for steamID, varTab in pairs(vars) do
             BASH.Players[steamID] = BASH.Players[steamID] or {};
             for var, val in pairs(varTab) do
