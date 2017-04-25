@@ -26,6 +26,16 @@ function BASH:EditSQLTables() end;
 
 function BASH.SQL:Init()
     if self.DB then return end;
+	
+	if !tmysql then
+        MsgErr("[BASH.SQL.Init] -> tmysql wasn't found!");
+        return;
+    end
+
+    if !BASH.Config.InitialSet then
+        MsgErr("[BASH.SQL.Init] -> Cannot setup the database until config has been initially set!");
+        return;
+    end
 
     /*
     **  Default SQL Structure [Do Not Edit]
@@ -72,16 +82,6 @@ function BASH.SQL:Init()
 
     hook.Call("GatherSQLTables", BASH);
 	hook.Call("EditSQLTables", BASH);
-
-    if !tmysql then
-        MsgErr("[BASH.SQL.Init] -> tmysql wasn't found!");
-        return;
-    end
-
-    if !BASH.Config.InitialSet then
-        MsgErr("[BASH.SQL.Init] -> Cannot setup the database until config has been initially set!");
-        return;
-    end
 
     self.DB = tmysql.Connect(
         BASH.Config:Get("sql_host"), BASH.Config:Get("sql_user"),
@@ -205,30 +205,32 @@ function BASH.SQL:TableCheck()
     MsgCon(color_sql, true, "Creating missing tables in local DB...");
     local lCreate = self:Query(localQuery, SQL_LOCAL);
     if lCreate == false then
-        MsgErr("[BASH.SQL.TableCheck] -> Local table check returned an error!");
+        MsgErr("[BASH.SQL.TableCheck] -> Local table creation returned an error!");
     else
         MsgCon(color_sql, true, "Missing tables were created in local DB.");
     end
 
-    local function tableCallback(results)
-        results = results[1];
-        if !results.status then
-            MsgErr("[BASH.SQL.TableCheck] -> Global table query returned an error! The rest of the SQL init process has been stopped.");
-            MsgErr(results.error);
-            return;
-        end
+    local function tableCallback(resultsTab)
+		for queryNum, results in pairs(resultsTab) do
+			if !results.status then
+				MsgErr("[BASH.SQL.TableCheck] -> Global table creation returned an error! The rest of the SQL init process has been stopped.");
+				MsgErr(results.error);
+				return;
+			end
+		end
 
         MsgCon(color_sql, true, "Missing tables were created in global DB.");
         BASH.SQL:ColumnCheck();
     end
 
     MsgCon(color_sql, true, "Creating missing tables in global DB...");
-    local gCreate = self:Query(globalQuery, SQL_GLOBAL);
+    local gCreate = self:Query(globalQuery, SQL_GLOBAL, tableCallback);
 end
 
 function BASH.SQL:ColumnCheck()
     if !self.Connected then return end;
-
+	
+	MsgCon(color_sql, true, "Creating missing columns in local DB...");
     local lCreate = self:Query("SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS;", SQL_LOCAL);
     if lCreate == false then
         MsgErr("[BASH.SQL.ColumnCheck] -> Local column check returned an error!");
@@ -247,64 +249,78 @@ function BASH.SQL:ColumnCheck()
 			end
 		end
 		
-		PrintTable(missing);
+		local missingQuery = "";
+		for tabName, tab in pairs(missing) do
+			if table.IsEmpty(tab) then continue end;
+			missingQuery = missingQuery .. Fmt("ALTER TABLE %s ADD(";, tabName);
+			for colName, col in pairs(tab) do
+				missingQuery = missingQuery .. Fmt("%s %s, ", colName, col);
+			end
+			missingQuery = string.sub(missingQuery, 1, string.len(missingQuery) - 2) .. "); ";
+		end
+		
+		local _missingQuery = self:Query(missingQuery, SQL_LOCAL);
+		if _missingQuery == false then
+			MsgErr("[BASH.SQL.ColumnCheck] -> Local column creation failed!");
+		else
+			MsgCon(color_sql, true, "Missing columns were created in local DB.");
+		end
     end
+	
+	local function gCreateCol(resultsTab)
+		for queryNum, results in pairs(resultsTab) do
+			if !results.status then
+				MsgErr("[BASH.SQL.ColumnCheck] -> Global column creation returned an error! The rest of the SQL init process has been stopped.");
+				MsgErr(results.error);
+				return;
+			end
+		end
 
-    /*
-    //optimize this
-    local create = {};
-    local columns, varName, exists, createStr;
-    for table, structTable in pairs(self.Tables) do
-        columns = self:Query("SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS;", structTable.SQLScope);
-        if !columns then
-            MsgErr("[BASH.SQL:ColumnCheck()]: Column query returned an empty set!");
-            continue;
-        end
-
-        for _, entry in pairs(structTable.Struct) do
-            varName = string.Explode("`", entry)[2];
-            if !varName or varName == "" then continue end;
-
-            for __, row in pairs(columns) do
-                if varName == row["COLUMN_NAME"] then
-                    exists = true;
-                    break;
-                end
-            end
-
-            if !exists then
-                create[varName] = entry;
-            end
-            exists = false;
-        end
-
-        if table.Count(create) > 0 then
-            createStr = "ALERT TABLE " .. table .. " ADD ";
-            for var, struct in pairs(create) do
-                createStr = createStr .. struct .. ", ";
-            end
-            createStr = string.sub(createStr, 1, #createStr - 2) .. ";";
-
-            local tabID = BASH:RandomString(4);
-            if !timer.Start(tabID .. "_push_col") then
-                timer.Create(tabID .. "_push_col", 30, 1, function()
-                    local createQuery = self:Query(createStr, structTable.SQLScope);
-                    if createQuery then
-                        MsgCon(color_red, true, "New columns pushed to table '%s' (%s)!", table, tabID);
-                    end
-                end);
-            end
-
-            MsgCon(color_red, true, "New columns ready to be pushed to '%s' (%s) in 15 seconds. Run \'bash_nopush %s\' to kill this operation.", table, tabID, tabID);
-        end
-    end
-
-    self:ColumnCleanup();
-    */
-end
-
-function BASH.SQL:ColumnCreate()
-
+        MsgCon(color_sql, true, "Missing columns were created in global DB.");
+        MsgCon(color_sql, true, "Database initialization complete!");
+		hook.Call("PostSQLInit", BASH);
+	end
+	
+	local missing = {};
+	for name, sqlTab in pairs(self.Tables) do
+		missing[name] = {};
+		for colName, col in pairs(sqlTab.Struct) do
+			missing[name][colName] = col;
+		end
+	end
+	
+	local function gCheckCol(resultsTab)
+		local tabName, colName;
+		for queryNum, results in pairs(resultsTab) do
+			if !results.status then
+				MsgErr("[BASH.SQL.ColumnCheck] -> Global column check returned an error! The rest of the SQL init process has been stopped.");
+				MsgErr(results.error);
+				continue;
+			end
+			
+			tabName = results.data["TABLE_NAME"];
+			colName = results.data["COLUMN_NAME"];
+			if missing[tabName] then
+				missing[tabName][colName] = nil;
+			end
+		end
+		
+		tabName, colName = nil, nil;
+		local missingQuery = "";
+		for tabName, tab in pairs(missing) do
+			if table.IsEmpty(tab) then continue end;
+			missingQuery = missingQuery .. Fmt("ALTER TABLE %s ADD(";, tabName);
+			for _colName, col in pairs(tab) do
+				missingQuery = missingQuery .. Fmt("%s %s, ", colName, col);
+			end
+			missingQuery = string.sub(missingQuery, 1, string.len(missingQuery) - 2) .. "); ";
+		end
+		
+		local _missingQuery = BASH.SQL:Query(missingQuery, SQL_GLOBAL, gCreateCol);
+	end
+	
+	MsgCon(color_sql, true, "Creating missing columns in global DB...");
+	local gCreate = self:Query("SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS;", SQL_GLOBAL, gCheckCol);
 end
 
 function BASH.SQL:GatherServerData()
@@ -326,6 +342,14 @@ function BASH.SQL:GatherServerData()
 
     MsgCon(color_sql, true, "Gathered server data from %d tables!", table.Count(data));
     self.ServerData = data;
+end
+
+function BASH.SQL:TableCleanup()
+	// utility func for dropping unused tables
+end
+
+function BASH.SQL:ColumnCleanup()
+	// utility func for dropping unused columns
 end
 
 function Player:SQLInit()
@@ -444,42 +468,6 @@ function Player:SQLGather()
     end
     _sql:Query(query, SQL_GLOBAL, gatherCallback);
 end
-
-concommand.Add("bash_nopush", function(ply, cmd, args)
-    if ply != NULL then
-        MsgCon(color_red, false, "\'bash_nopush\' must be called from the dedicated server console!");
-        return;
-    end
-    if !args[1] then
-        MsgCon(color_red, false, "\'bash_nopush\' must be called with a table ID!");
-        return;
-    end
-
-    local tabID = args[1];
-    if !timer.Stop(tabID .. "_push_col") then
-        MsgCon(color_red, false, "No table with that ID is being pushed to, or the operation has already been halted!");
-    else
-        MsgCon(color_sql, true, "New columns will not be pushed to table with ID '%s'.", tabID);
-    end
-end);
-
-concommand.Add("bash_nodrop", function(ply, cmd, args)
-    if ply != NULL then
-        MsgCon(color_red, false, "\'bash_nodrop\' must be called from the dedicated server console!");
-        return;
-    end
-    if !args[1] then
-        MsgCon(color_red, false, "\'bash_nodrop\' must be called with a table ID!");
-        return;
-    end
-
-    local tabID = args[1];
-    if !timer.Stop(tabID .. "_drop_col") then
-        MsgCon(color_red, false, "No table with that ID is being dropped from, or the operation has already been halted!");
-    else
-        MsgCon(color_sql, true, "Old columns will not be dropped from table with ID '%s'.", tabID);
-    end
-end);
 
 /*
 **
