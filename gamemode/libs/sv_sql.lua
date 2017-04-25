@@ -39,9 +39,8 @@ function BASH.SQL:Init()
         Type = SQL_GLOBAL,
         Scope = DATA_PLY,
         Struct = {
-            "`SteamName` TEXT NOT NULL",
-            "`SteamID` TEXT NOT NULL",
-            "`PlayerFlags` TEXT NOT NULL"
+			["SteamName"] = "TEXT NOT NULL",
+			["PlayerFlags"] = "TEXT NOT NULL"
         }
     };
 
@@ -50,11 +49,9 @@ function BASH.SQL:Init()
         Type = SQL_GLOBAL,
         Scope = DATA_CHAR,
         Struct = {
-            "`CharName` TEXT NOT NULL",
-            "`CharDesc` TEXT NOT NULL",
-            "`Model` TEXT NOT NULL",
-            "`Weapons` TEXT NOT NULL",
-            "`Equipment` TEXT NOT NULL"
+			["CharName"] = "TEXT NOT NULL",
+			["CharDesc"] = "TEXT NOT NULL",
+			["BaseModel"] = "TEXT NOT NULL"
         }
     };
 
@@ -63,13 +60,13 @@ function BASH.SQL:Init()
         Type = SQL_GLOBAL,
         Scope = DATA_PLY,
         Struct = {
-            "`VictimName` TEXT NOT NULL",
-            "`VictimSteamID` TEXT NOT NULL",
-            "`BannerName` TEXT NOT NULL",
-            "`BannerSteamID` TEXT NOT NULL",
-            "`BanTime` INT(10) NOT NULL",
-            "`BanLength` INT(10) NOT NULL",
-            "`BanReason` TEXT NOT NULL"
+			["VictimName"] = "TEXT NOT NULL",
+			["VictimSteamID"] = "TEXT NOT NULL",
+			["BannerName"] = "TEXT NOT NULL",
+			["BannerSteamID"] = "TEXT NOT NULL",
+			["BanTime"] = "INT(10) NOT NULL",
+			["BanLength"] = "INT(10) NOT NULL",
+			["BanReason"] = "TEXT NOT NULL"
         }
     };
 
@@ -140,28 +137,26 @@ function BASH.SQL:AddTable(sqlTab)
     sqlTab.Scope = sqlTab.Scope or DATA_PLY;
     //  If the user has supplied a struct, then we assume they know what they're doing.
     sqlTab.Struct = sqlTab.Struct or {};
-    if !sqlTab.StructOverride then
-        if sqlTab.Scope == DATA_PLY then
-            table.insert(sqlTab.Struct, 1, "`PlayerNum` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT");
-            table.insert(sqlTab.Struct, 2, "`SteamID` TEXT NOT NULL");
-            sqlTab.Key = "PlayerNum";
-        elseif sqlTab.Scope == DATA_CHAR then
-            table.insert(sqlTab.Struct, 1, "`CharNum` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT");
-            table.insert(sqlTab.Struct, 2, "`SteamID` TEXT NOT NULL");
-            table.insert(sqlTab.Struct, 3, "`CharID` TEXT NOT NULL");
-            sqlTab.Key = "CharNum";
-        elseif sqlTab.Scope == DATA_SERVER then
-            table.insert(sqlTab.Struct, 1, "`EntryNum` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT");
-            sqlTab.Key = "EntryNum";
-        end
-    end
+	if sqlTab.Scope == DATA_PLY then
+		sqlTab.Struct["PlayerNum"] = "INT(10) UNSIGNED NOT NULL AUTO_INCREMENT";
+		sqlTab.Struct["SteamID"] = "TEXT NOT NULL";
+		sqlTab.Key = "PlayerNum";
+	elseif sqlTab.Scope == DATA_CHAR then
+		sqlTab.Struct["CharNum"] = "INT(10) UNSIGNED NOT NULL AUTO_INCREMENT";
+		sqlTab.Struct["SteamID"] = "TEXT NOT NULL";
+		sqlTab.Struct["CharID"] = "TEXT NOT NULL";
+		sqlTab.Key = "CharNum";
+	elseif sqlTab.Scope == DATA_SERVER then
+		sqlTab.Struct["EntryNum"] = "INT(10) UNSIGNED NOT NULL AUTO_INCREMENT";
+		sqlTab.Key = "EntryNum";
+	end
     sqlTab.Key = sqlTab.Key or "PlayerNum";
 
     self.Tables[sqlTab.Name] = sqlTab;
     MsgCon(color_sql, true, "Table registered with name '%s'.", sqlTab.Name);
 end
 
-function BASH.SQL:AddColumn(tableName, colName, colType)
+function BASH.SQL:AddColumn(tableName, colName, colType, override)
     if !tableName or !colName or !colType then return end;
     if !self.Tables[tableName] then
         MsgErr("[BASH.SQL.AddColumn] -> A table with the name '%s' doesn't exist!", name);
@@ -171,10 +166,19 @@ function BASH.SQL:AddColumn(tableName, colName, colType)
         MsgErr("[BASH.SQL.AddColumn] -> A default SQL structure of the type '%s' doesn't exist!", colType);
         return;
     end
-
-    local len = #self.Tables[tableName].Struct;
-    self.Tables[tableName].Struct[len + 1] = '`' .. colName .. '` ' .. SQL_TYPE[colType];
-    MsgCon(color_sql, true, "Appended row '%s' of %s type onto table '%s'.", colName, colType, tableName);
+	
+	if self.Tables[tableName].Struct[colName] then
+		if override then
+			MsgCon(color_sql, true, "Overriding column '%s' in table '%s'.", colName, tableName);
+		else
+			MsgErr("[BASH.SQL.AddColumn] -> The column '%s' already exists in table '%s'! Provide the override argument to this function to bypass this.", colName, tableName);
+			return;
+		end
+	else
+		MsgCon(color_sql, true, "Adding column '%s' to table '%s'.", colName, tableName);
+	end
+	
+	self.Tables[tableName].Struct[colName] = SQL_TYPE[colType];
 end
 
 function BASH.SQL:TableCheck()
@@ -185,14 +189,14 @@ function BASH.SQL:TableCheck()
     for name, sqlTab in pairs(self.Tables) do
         if sqlTab.Type == SQL_GLOBAL then
             globalQuery = globalQuery .. Fmt("CREATE TABLE IF NOT EXISTS '%s'(", name);
-            for index, col in pairs(sqlTab.Struct) do
-                globalQuery = globalQuery .. col .. ", ";
+            for colName, col in pairs(sqlTab.Struct) do
+				globalQuery = globalQuery .. Fmt("`%s` %s, ", colName, col);
             end
             globalQuery = globalQuery .. Fmt("PRIMARY KEY('%s')); ", sqlTab.Key);
         elseif sqlTab.Type == SQL_LOCAL then
             localQuery = localQuery .. Fmt("CREATE TABLE IF NOT EXISTS '%s'(", name);
-            for index, col in pairs(sqlTab.Struct) do
-                localQuery = localQuery .. col .. ", ";
+            for colName, col in pairs(sqlTab.Struct) do
+				localQuery = localQuery .. Fmt("`%s` %s, ", colName, col);
             end
             localQuery = localQuery .. Fmt("PRIMARY KEY('%s')); ", sqlTab.Key);
         end
@@ -229,7 +233,21 @@ function BASH.SQL:ColumnCheck()
     if lCreate == false then
         MsgErr("[BASH.SQL.ColumnCheck] -> Local column check returned an error!");
     else
-        PrintTable(lCreate);
+		local missing = {};
+		for name, sqlTab in pairs(self.Tables) do
+			missing[name] = {};
+			for colName, col in pairs(sqlTab.Struct) do
+				missing[name][colName] = col;
+			end
+		end
+		
+		for _, row in pairs(lCreate) do
+			if missing[row[1]][row[2]] then
+				missing[row[1]][row[2]] = nil;
+			end
+		end
+		
+		PrintTable(missing);
     end
 
     /*
@@ -287,57 +305,6 @@ end
 
 function BASH.SQL:ColumnCreate()
 
-end
-
-function BASH.SQL:ColumnCleanup()
-    if !self.SQLConnected then return end;
-
-    local dump = {};
-    local columns, varName, exists, dumpStr;
-    for table, structTable in pairs(self.Tables) do
-        columns = self:Query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = \'" .. table .. "\';");
-        if !columns then
-            MsgErr("[BASH.SQL:ColumnCleanup()]: Columns query returned an empty set!");
-            continue;
-        end
-
-        for _, row in pairs(columns) do
-            for __, entry in pairs(structTable.Struct) do
-                varName = string.Explode("`", entry)[2];
-                if varName == row["COLUMN_NAME"] then
-                    exists = true;
-                    break;
-                end
-            end
-            if !exists then
-                dump[row["COLUMN_NAME"]] = true;
-            end
-            exists = false;
-        end
-
-        if table.Count(dump) > 0 then
-            dumpStr = "ALERT TABLE " .. table .. " DROP COLUMN ";
-            for var, struct in pairs(dump) do
-                dumpStr = dumpStr .. struct .. ", ";
-            end
-            dumpStr = string.sub(dumpStr, 1, #dumpStr - 2) .. ";";
-
-            local tabID = BASH:RandomString(4);
-            if !timer.Start(tabID .. "_drop_col") then
-                timer.Create(tabID .. "_drop_col", 30, 1, function()
-                    local dumpQuery = self:Query(dumpStr, structTable.SQLScope);
-                    if dumpQuery then
-                        MsgCon(color_red, true, "Old columns dropped from table '%s' (%s)!", table, tabID);
-                    end
-                end);
-            end
-
-            MsgCon(color_red, true, "Old columns ready to be dropped from '%s' (%s) in 15 seconds. Run \'bash_nodrop %s\' to kill this operation.", table, tabID, tabID);
-        end
-    end
-
-    MsgCon(color_sql, true, "Database initialization complete!");
-    self:GatherServerData();
 end
 
 function BASH.SQL:GatherServerData()

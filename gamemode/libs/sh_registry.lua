@@ -116,6 +116,18 @@ if CLIENT then
 
 elseif SERVER then
 
+	function BASH.Registry:PushToColumns()
+		for name, var in pairs(self.Vars) do
+			if !var.SQLTable or var.SQLTable == "" then continue end;
+			if !BASH.SQL.Tables[var.SQLTable] then
+				MsgErr("[BASH.Registry.PushToColumns] -> No such SQL table '%s' exists for variable '%s'!", var.SQLTable, name);
+				continue;
+			end
+			
+			BASH.SQL:AddColumn(var.SQLTable, name, var.Type);
+		end
+	end
+
     function Player:SetVars(vars)
         if !checkply(self) then return end;
         if !varTab or table.IsEmpty(varTab) then return end;
@@ -293,6 +305,13 @@ if CLIENT then
     end);
 
 elseif SERVER then
+	/*
+	**	BASH Hooks
+	*/
+	hook.Add("EditSQLTables", "BASH_InsertVariablesIntoSQL", function()
+		BASH.Registry:PushToColumns();
+	end);
+
     /*
     **  Networking
     */

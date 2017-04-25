@@ -6,7 +6,7 @@ function BASH:Init()
 	/*
 	**	These are special libs that need to be initialized before the others.
 	*/
-	local specials = {"SQL", "Registry", "Config"};
+	local specials = {"Registry", "SQL", "Config"};
 	for _, lib in ipairs(specials) do
 		MsgCon(color_green, true, "Initializing '%s' library...", lib);
 		self[lib]:Init();
