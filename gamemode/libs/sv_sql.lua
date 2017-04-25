@@ -26,16 +26,6 @@ function BASH:EditSQLTables() end;
 
 function BASH.SQL:Init()
     if self.DB then return end;
-	
-	if !tmysql then
-        MsgErr("[BASH.SQL.Init] -> tmysql wasn't found!");
-        return;
-    end
-
-    if !BASH.Config.InitialSet then
-        MsgErr("[BASH.SQL.Init] -> Cannot setup the database until config has been initially set!");
-        return;
-    end
 
     /*
     **  Default SQL Structure [Do Not Edit]
@@ -82,6 +72,18 @@ function BASH.SQL:Init()
 
     hook.Call("GatherSQLTables", BASH);
 	hook.Call("EditSQLTables", BASH);
+	
+	if !tmysql then
+        MsgErr("[BASH.SQL.Init] -> tmysql wasn't found!");
+		self.Tables = {};
+        return;
+    end
+
+    if !BASH.Config.InitialSet then
+        MsgErr("[BASH.SQL.Init] -> Cannot setup the database until config has been initially set!");
+		self.Tables = {};
+        return;
+    end
 
     self.DB = tmysql.Connect(
         BASH.Config:Get("sql_host"), BASH.Config:Get("sql_user"),

@@ -73,7 +73,7 @@ OPER["<="] = function(a, b) return a <= b end;
 
 PREFIXES_CLIENT = {"cl_", "vgui_"};
 PREFIXES_SERVER = {"sv_"};
-PREFIXES_SHARED = {"sh_", "item_", "obj_", string.sub(game.GetMap(), 1, string.find(game.GetMap(), '_', 1))};
+PREFIXES_SHARED = {"sh_", "item_", "obj_", string.Explode('_', game.GetMap())[1] .. "_"};
 
 SQL_TYPE = {};
 SQL_TYPE["boolean"] = "TINYINT(4) UNSIGNED NOT NULL";

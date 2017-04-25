@@ -115,8 +115,18 @@ function BASH.Config:Init()
 end
 
 function BASH.Config:AddGroup(name, icon)
-    local tab = Conf_Group:Create(name, icon);
-    if !tab then return end;
+	if !name then return end;
+	if icon and !ICONS[icon] then
+		MsgErr("[BASH.Config.AddGroup] -> Tried creating a group '%s' with a non-existant icon '%s'! Reverting to default cog.", name, icon);
+		icon = "cog-alt";
+	end
+	
+	local tab = {};
+	tab.Name = name;
+	tab.Icon = ICONS[icon or "cog-alt"];
+	tab.Entries = {};
+	tab.FileName = string.lower(BASH:GetSafeFilename(name));
+	
     MsgCon(color_green, false, "Creating config group '%s'!", name);
     table.insert(self.Groups, (name != "Unsorted" and #self.Groups > 0 and #self.Groups) or (#self.Groups + 1), tab);
 end
@@ -127,22 +137,56 @@ function BASH.Config:GetGroup(name)
     end
 end
 
-function BASH.Config:AddEntry(confTab, group)
-    if !confTab then return end;
-    if !group then group = "Unsorted" end;
-    local groupTab = self:GetGroup(group);
-    if !groupTab then
-        MsgErr("[BASH.Config.AddEntry] -> Tried adding a config entry to a non-existant group '%s'!", group);
-        return;
-    end
+function BASH.Config:SetGroupIcon(name, icon)
+	if !name then return end;
+	local group = self:GetGroup(name);
+	if !group then
+		MsgErr("[BASH.Config.SetGroupIcon] -> No such group '%s' exists!", name);
+		return;
+	end
+	if icon and !ICONS[icon] then
+		MsgErr("[BASH.Config.SetGroupIcon] -> Tried setting the icon of group '%s' to a non-existant icon '%s'! Reverting to default cog.", name, icon);
+		icon = "cog-alt";
+	end
+	
+	MsgCon(color_green, false, "Setting icon of group '%s' to '%s'.", name, icon);
+	group.Icon = ICONS[icon or "cog-alt"];
+end
 
-    if groupTab:AddEntry(confTab) then
-        self.IDRef[confTab.ID] = confTab;
+function BASH.Config:AddEntry(confTab)
+	if !confTab then return end;
+	if !confTab.ID then
+		MsgErr("[BASH.Config.AddEntry] -> Tried adding a config entry with no ID!");
+		return;
+	end
+	if self.IDRef[confTab.ID] then
+		local exists = self.IDRef[confTab.ID];
+		MsgErr("[BASH.Config.AddEntry] -> A config entry with the ID '%s' already exists in group '%s'!", confTab.ID, exists.Group);
+		return;
+	end
+
+    confTab.Name =          confTab.Name or "Unknown Entry";
+    confTab.Desc =          confTab.Desc or "";
+	confTab.Group =			confTab.Group or "Unsorted";
+    confTab.Type =          confTab.Type or "Number";
+    confTab.MenuElement =   confTab.MenuElement or "DNumberWang";
+    confTab.Default =       confTab.Default or 0;
+    confTab.AccessLevel =   confTab.AccessLevel or 100;
+    if confTab.MenuElement == "DNumberWang" then
+        confTab.Min = confTab.Min or 0;
+        confTab.Max = confTab.Max or 1;
     end
+    if confTab.MenuElement == "DComboBox" then
+        confTab.Options = confTab.Options or {"Option 1", "Option 2"};
+    end
+	
+	local group = self:GetGroup(confTab.Group);
+	group.Entries[#group.Entries + 1] = confTab;
 end
 
 function BASH.Config:GetEntry(id)
-    return self.IDRef[id or ""];
+	if !id then return end;
+    return self.IDRef[id];
 end
 
 function BASH.Config:Load()
@@ -164,7 +208,7 @@ function BASH.Config:Load()
 
     local fileName, fileCont;
     for _, groupTab in pairs(self.Groups) do
-        fileName = "bash/config/" .. string.lower(BASH:GetSafeFilename(groupTab.Name));
+        fileName = "bash/config/" .. groupTab.FileName);
         if !file.Exists(fileName, "DATA") then
             BASH:CreateFile(fileName);
 
@@ -172,11 +216,10 @@ function BASH.Config:Load()
             for __, confTab in pairs(groupTab.Entries) do
                 fileCont[confTab.ID] = confTab.Default;
             end
-            fileCont = detype(fileCont, "string");
-            BASH:WriteToFile(fileName, fileCont, true);
+            BASH:WriteToFile(fileName, von.serialize(fileCont), true);
         else
             fileCont = file.Read(fileName, "DATA");
-            fileCont = detype(fileCont, "table");
+			fileCont = von.deserialize(fileCont);
         end
 
         for __, confTab in pairs(groupTab.Entries) do
@@ -201,20 +244,21 @@ if SERVER then
 
         local fileName, groupCont;
         for _, groupTab in pairs(self.Groups) do
-            fileName = "bash/config/" .. string.lower(BASH:GetSafeFilename(groupTab.Name));
+            fileName = "bash/config/" .. groupTab.FileName);
 
             groupCont = {};
             for __, confTab in pairs(groupTab.Entries) do
                 if confTab.Value != nil then
                     groupCont[confTab.ID] = confTab.Value;
-                end
+                else
+					groupCont[confTab.ID] = confTab.Default;
+				end
             end
-            groupCont = detype(groupCont, "string");
-
+			
+			groupCont = von.serialize(groupCont);
             if !file.Exists(fileName, "DATA") then
                 BASH:CreateFile(fileName);
             end
-
             BASH:WriteToFile(fileName, groupCont, true);
         end
     end
