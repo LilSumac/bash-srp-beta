@@ -14,15 +14,21 @@ end
 function BASH:Init()
 	if self.Initialized then return end;
 
-	self.Cookies:Init();
-	self.GUI:Init();
-	self.Themes:Init();
-	self.Commands:Init();
-	self.Config:Init();
-	self.Modules:Init();
-	self.Ranks:Init();
-	self.Registry:Init();
+	/*
+	**	These are special libs that need to be initialized before the others.
+	*/
+	local specials = {"Registry", "Config"};
+	for _, lib in ipairs(specials) do
+		MsgCon(color_green, true, "Initializing '%s' library...", lib);
+		self[lib]:Init();
+		self[lib].Initialized = true;
+		MsgCon(color_green, true, "'%s' initialization complete!", lib);
+	end
+	/*
+	**
+	*/
 
+	self:LibInit();
 	hook.Call("OnInit", self);
 	MsgCon(color_green, true, "Successfully initialized client-side. Init time: %f seconds.", math.Round(SysTime() - self.StartTime, 5));
 	self.Initialized = true;

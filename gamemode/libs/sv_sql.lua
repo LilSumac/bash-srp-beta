@@ -100,13 +100,6 @@ function BASH.SQL:Init()
     else
         MsgCon(color_sql, "Database connected successfully!");
         self.Connected = true;
-        self:TableCheck();
-        timer.Simple(0.5, function()
-            BASH.SQL:ColumnCheck();
-        end);
-        timer.Simple(1, function()
-            self:GatherServerData();
-        end);
     end
 end
 
@@ -216,12 +209,13 @@ function BASH.SQL:TableCheck()
     local function tableCallback(results)
         results = results[1];
         if !results.status then
-            MsgErr("[BASH.SQL.TableCheck] -> Global table query returned an error!");
+            MsgErr("[BASH.SQL.TableCheck] -> Global table query returned an error! The rest of the SQL init process has been stopped.");
             MsgErr(results.error);
             return;
         end
 
         MsgCon(color_sql, true, "Missing tables were created in global DB.");
+        BASH.SQL:ColumnCheck();
     end
 
     MsgCon(color_sql, true, "Creating missing tables in global DB...");
@@ -518,6 +512,13 @@ concommand.Add("bash_nodrop", function(ply, cmd, args)
     else
         MsgCon(color_sql, true, "Old columns will not be dropped from table with ID '%s'.", tabID);
     end
+end);
+
+/*
+**
+*/
+hook.Add("PostLoadVariables", "BASH_DelaySQLInitForRegistry", function()
+    BASH.SQL:TableCheck();
 end);
 
 BASH:RegisterLib(BASH.SQL);

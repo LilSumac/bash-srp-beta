@@ -17,6 +17,7 @@ function BASH.Registry:Init()
     // lol
 
     hook.Call("LoadVariables", BASH);
+    hook.Call("PostLoadVariables", BASH);
 end
 
 /*
@@ -47,7 +48,7 @@ function BASH.Registry:AddVariable(var)
     var.Type = var.Type or "string";
     var.Default = var.Default or "";
     var.Public = var.Public or false;
-    var.SQLTable = var.SQLTable or "bash_players";
+    var.SQLTable = var.SQLTable or "";
 
     self.Vars[var.Name] = var;
 
@@ -154,7 +155,7 @@ elseif SERVER then
         end
     end
 
-    function Player:Register(data)
+    function Player:Register()
         if !checkply(self) then return end;
         if !BASH.Registry.Vars then return end;
 
@@ -270,7 +271,7 @@ if CLIENT then
     vnet.Watch("BASH_REGISTRY_PROGRESS", function(data)
         local progress = data:String();
         MsgCon(color_sql, true, progress);
-        // set data:String() to current message
+        // set current message to progress
     end);
 
     vnet.Watch("BASH_REGISTRY_QUEUED", function(data)

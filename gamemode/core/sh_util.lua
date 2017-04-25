@@ -288,10 +288,11 @@ function BASH:LibInit()
     if !self.Libraries then return end;
 
     for name, lib in pairs(self.Libraries) do
-        if !self:LibDepMet(self) then continue end;
-        if !lib.Init then continue end;
+        if !self:LibDepMet(self) or !lib.Init or lib.Initialized then continue end;
+
         MsgCon(color_green, true, "Initializing '%s' library...", lib.Name);
         lib:Init();
+        lib.Initialized = true;
         MsgCon(color_green, true, "'%s' initialization complete!", lib.Name);
     end
 end
