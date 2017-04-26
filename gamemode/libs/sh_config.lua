@@ -302,7 +302,7 @@ if CLIENT then
     **  Networking
     */
     net.Receive("BASH_CONFIG_INIT", function(len)
-        BASH.SettingConfig = true;
+        BASH.IntroNewPly = true;
     end);
 
     net.Receive("BASH_CONFIG_ISSET", function(len)

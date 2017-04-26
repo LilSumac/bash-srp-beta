@@ -29,7 +29,8 @@ local colorL, colorT, colorR, colorB;
 local bgSeq = {
     Color(51, 153, 255),
     Color(0, 153, 153),
-    Color(102, 0, 204)
+    Color(0, 153, 76),
+    Color(153, 153, 0)
 };
 
 //  Alphas
@@ -41,21 +42,34 @@ local gradV = Material("gui/gradient_down");
 
 //  Element Resources
 local called = false;
-local headers = {
+local confHeaders = {
     "Welcome to BASH",
     "General Information",
     "Database Credentials"
 };
-local subheaders = {
+local confSubheaders = {
     "Thank you for installing BASH. This short walkthrough will set up the most basic information needed to run the gamemode. You can quit and come back to this at any time, although this should only take a minute. Let's get started!",
     "Name your community, and other basic information for your server.",
     "BASH requires an external database to function. Here is where you provide necessary connection information."
 };
-local elements = {
+local confElements = {
     {},
     {"community_name", "community_website"},
     {"sql_host", "sql_user", "sql_pass", "sql_name", "sql_port"}
 };
+local newHeaders = {
+    "Welcome!",
+    "What is #!/BASH?",
+    "How do you play?",
+    "Header3"
+};
+local newSubheaders = {
+    "Hello and welcome to the #!/BASH public beta. You're in for an exclusive look at a roleplay gamemode many years in the making. Please keep these things in mind:<br><br>* All features and content are subject to change.<br>* Any bugs or instabilities are being worked on, and we appreciate your patience.<br>* Staff are waiting and ready to assist you should you need it.<br><br>By proceeding, you agree to abide by the server rules.",
+    "BASH is a gamemode developed by LilSumac over the course of several years. In early 2016, an alpha version was released as a public server, to mild success. However, the gamemode itself was not ready for the demands of a populated server, and thus the project was scrapped. Source code for the alpha can be found at github.com/LilSumac/bash-srp-alpha.<br><br>Now, after completely gutting the initial version and starting anew, the BASH beta aims to deliver a smooth, streamlined experience to you, the player. We hope that you find the gamemode to be responsive, immersive, and visually appealing.",
+    "Like many other popular gamemodes such as Clockwork, NutScript, and TacoScript, BASH is a serious roleplay framework. This is not a DarkRP, PERP, or any other 'lite' RP gamemode, and should not be played as one. BASH relies heavily on character creation, development, and interaction with your fellow players rather than just shooting and looting. In addition, the gamemode itself is usually based within some kind of universe, ranging from popular video games such as S.T.A.L.K.E.R. and Half-life 2 to more realistic scenarios like real-world military conflicts and apocalyptic settings.<br><br>If you are unfamiliar with the concept described here, feel free to reach out to a staff member and they will assist you in getting oriented.",
+    "Sub 3"
+};
+local newElements = {};
 
 /*
 **
@@ -64,7 +78,7 @@ local elements = {
 function BASH.Intro:DrawLoading()
     if gui.IsGameUIVisible() then return end;
 
-    if !LP().Initialized and !BASH.SettingConfig then
+    if !LP().Initialized and !BASH.SettingConfig and !BASH.IntroNewPly then
         alphaAnim = Lerp(0.01, alphaAnim, 255);
         draw.FadeColor(colBG, color_white, 0.01);
     end
@@ -113,12 +127,13 @@ function BASH.Intro:DrawLoading()
         alphaAnim = Lerp(0.05, alphaAnim, 0);
         if alphaBG < 1 and alphaAnim < 1 then
             if BASH.IntroNewPly then
-                self.Stage = "NewPly";
+                called = false;
+                self.Stage = "Setup";
             else
                 self.Stage = "Done";
             end
         end
-    elseif BASH.SettingConfig then
+    elseif BASH.SettingConfig or BASH.IntroNewPly then
         alphaAnim = Lerp(0.05, alphaAnim, 0);
         if alphaAnim < 1 then
             called = false;
@@ -139,6 +154,9 @@ end
 function BASH.Intro:DrawSetup()
     if called then return end;
     local elem, bk, nx = self.SetupElement;
+    local elements = (BASH.SettingConfig and confElements) or newElements;
+    local headers = (BASH.SettingConfig and confHeaders) or newHeaders;
+    local subheaders = (BASH.SettingConfig and confSubheaders) or newSubheaders;
     if !checkpanel(elem) then
         //  Just to prevent an empty frame with the awkward background.
         surface.SetDrawColor(colBG);
@@ -151,7 +169,7 @@ function BASH.Intro:DrawSetup()
         elem:ShowCloseButton(false);
         elem:SetDraggable(false);
         elem:MakePopup();
-        elem.SubCache = string.Explode('\n', string.wrap(subheaders[1], "bash-light-24", w * 0.33));
+        elem.SubCache = string.Explode('\n', string.wrap(subheaders[1], "bash-light-24", w * 0.4));
         elem.StepChildren = {};
         elem.SetStep = function(_self, step)
             BASH.Intro.CurStep = step;
@@ -161,13 +179,17 @@ function BASH.Intro:DrawSetup()
                 end
             end
 
-            local sub = string.wrap(subheaders[step], "bash-light-24", w * 0.33);
+            local sub = string.wrap(subheaders[step], "bash-light-24", w * 0.4);
             _self.SubCache = string.Explode('\n', sub);
 
             if step == 1 then
-                _self.BackButton.DrawText = "Cancel";
+                if BASH.SettingConfig then
+                    _self.BackButton.DrawText = "Cancel";
+                else
+                    _self.BackButton.DrawText = "Disconnect";
+                end
                 _self.NextButton.DrawText = "Begin";
-            elseif step == #elements then
+            elseif step == #headers then
                 _self.BackButton.DrawText = "Back";
                 _self.NextButton.DrawText = "Finish";
             else
@@ -196,13 +218,21 @@ function BASH.Intro:DrawSetup()
             surface.DrawRect(0, 0, _w, _h);
 
             draw.SimpleText(headers[BASH.Intro.CurStep], "bash-regular-36", _w / 2, (h * 0.2), colAnim, TEXT_CENT, TEXT_TOP);
+
             //  Cache the subheader lines for efficiency.
             for index, line in pairs(_self.SubCache) do
-                draw.SimpleText(line, "bash-light-24", _w / 2, (h * 0.2) + 40 + ((index - 1) * 24) + ((BASH.Intro.CurStep == 1 and 100) or 0), colAnim, TEXT_CENT, TEXT_TOP);
+                if BASH.IntroNewPly or (BASH.SettingConfig and BASH.Intro.CurStep == 1) then
+                    local boxH = 24 * #_self.SubCache;
+                    //  Center the new player intro text.
+                    draw.SimpleText(line, "bash-light-24", _w / 2, (_h / 2) - (boxH / 2) + ((index - 1) * 24), colAnim, TEXT_CENT, TEXT_TOP);
+                elseif BASH.SettingConfig then
+                    //  Offset the config setup text.
+                    draw.SimpleText(line, "bash-light-24", _w / 2, (h * 0.2) + 40 + ((index - 1) * 24), colAnim, TEXT_CENT, TEXT_TOP);
+                end
             end
 
-            local wid = (8 * #elements) + (24 * (#elements - 1));
-            for index = 1, #elements do
+            local wid = (8 * #headers) + (24 * (#headers - 1));
+            for index = 1, #headers do
                 draw.Circle(
                     (CENTER_X - (wid / 2)) + (24 * (index - 1)) + 4,
                     (h * 0.8) - 16,
@@ -216,12 +246,20 @@ function BASH.Intro:DrawSetup()
         bk:SetSize(150, 36);
         bk:SetPos(left, down - 36);
         bk:SetText("");
-        bk.DrawText = "Cancel";
+        bk.DrawText = (BASH.SettingConfig and "Cancel") or "Disconnect";
         bk.DoClick = function(_self)
+            if _self.DrawText == "Disconnect" then
+                RunConsoleCommand("disconnect");
+                return;
+            end
+
             if BASH.Intro.CurStep == 1 then
-                net.Empty("BASH_CONFIG_INIT_CANCEL");
+                if BASH.SettingConfig then
+                    net.Empty("BASH_CONFIG_INIT_CANCEL");
+                    BASH.SettingConfig = false;
+                end
+
                 BASH.Intro.Stage = "Loading";
-                BASH.SettingConfig = false;
                 alphaAnim = 0;
 
                 local parent = _self:GetParent();
@@ -242,7 +280,7 @@ function BASH.Intro:DrawSetup()
         nx:SetText("");
         nx.DrawText = "Begin";
         nx.DoClick = function(_self)
-            if BASH.Intro.CurStep == #elements then
+            if BASH.Intro.CurStep == #headers then
 
                 return;
             end
