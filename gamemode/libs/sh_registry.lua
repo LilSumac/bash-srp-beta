@@ -17,7 +17,6 @@ function BASH.Registry:Init()
     // lol
 
     hook.Call("LoadVariables", BASH);
-    hook.Call("PostLoadVariables", BASH);
 end
 
 /*
@@ -123,7 +122,7 @@ elseif SERVER then
 				MsgErr("[BASH.Registry.PushToColumns] -> No such SQL table '%s' exists for variable '%s'!", var.SQLTable, name);
 				continue;
 			end
-			
+
 			BASH.SQL:AddColumn(var.SQLTable, name, var.Type);
 		end
 	end
@@ -195,6 +194,8 @@ elseif SERVER then
     	self:PushData();
     	self:PullData();
 
+        hook.Call("OnRegister", BASH, self);
+
         net.Empty("BASH_PLAYER_LOADED", self);
 
     	self.Registered = true;
@@ -233,7 +234,7 @@ elseif SERVER then
 
     //  Push To Registry
     function Player:PushData()
-        MsgCon(color_green, false, "[PUSH] %s", self:Name());
+        MsgCon(color_darkgreen, false, "[PUSH] %s", self:Name());
 
         local vars = {};
 		for name, var in pairs(BASH.Registry.Vars) do
@@ -246,7 +247,7 @@ elseif SERVER then
 
     //  Pull From Players
     function Player:PullData()
-    	MsgCon(color_green, false, "[PULL] %s", self:Name());
+    	MsgCon(color_darkgreen, false, "[PULL] %s", self:Name());
 
         local pullTab, varTab = {};
         for steamID, vars in pairs(BASH.Registry.Players) do
@@ -283,14 +284,14 @@ if CLIENT then
     vnet.Watch("BASH_REGISTRY_PROGRESS", function(data)
         local progress = data:String();
         MsgCon(color_sql, true, progress);
-        // set current message to progress
+        BASH.IntroMessage = progress;
     end);
 
     vnet.Watch("BASH_REGISTRY_QUEUED", function(data)
         local places = data:Table();
         local place = places[LP():SteamID()] or -1;
         MsgCon(color_sql, true, "You're in position %n for the registry queue.", place);
-        LP().QueuePlace = place;
+        BASH.IntroMessage = Fmt("You're in position %n for the registry queue.", place);
     end);
 
     vnet.Watch("BASH_UPDATE_VAR", function(data)

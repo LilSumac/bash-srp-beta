@@ -7,7 +7,7 @@ BASH.Commands.KeywordRef = BASH.Commands.KeywordRef or {};
 BASH.Commands.Dependencies = {["Ranks"] = true, ["SQL"] = SERVER};
 
 function BASH.Commands:Init()
-    self:AddEntry{
+    self:AddCommand{
         ID = "initconfig",
         Name = "Initialize Config",
         Desc = "Starts the inital config to be set up by the targeted player.",
@@ -46,7 +46,7 @@ function BASH.Commands:Init()
         end
     };
 
-    self:AddEntry{
+    self:AddCommand{
         ID = "setowner",
         Name = "Set Owner",
         Desc = "Add a player to the \'owner\' rank through the server console.",
@@ -81,7 +81,7 @@ function BASH.Commands:Init()
         end
     };
 
-    self:AddEntry{
+    self:AddCommand{
         ID = "maxlast",
         Name = "Maximize Last",
         Desc = "Maximize the last window minimized.",
@@ -89,7 +89,7 @@ function BASH.Commands:Init()
         IsInScope = CLIENT,
         Function = function(self, ply, args)
             if !checkpanel(BASH.GUI.LastMinimized) then
-                MsgCon(color_red, false, "[CMD.maximizelast()]: No valid panel to maximize!");
+                MsgCon(color_darkred, false, "[CMD.maximizelast()]: No valid panel to maximize!");
                 return;
             end
 
@@ -101,18 +101,18 @@ function BASH.Commands:Init()
     hook.Call("LoadCommands", BASH);
 end
 
-function BASH.Commands:AddEntry(commTab)
+function BASH.Commands:AddCommand(commTab)
     if !commTab then return end;
     if !commTab.ID then
-        MsgErr("[BASH.Commands:AddEntry(%s)]: Tried adding a command with no ID!", concatArgs(commTab));
+        MsgErr("[BASH.Commands.AddCommand] -> Tried adding a command with no ID!");
         return;
     end
     if self.Entries[commTab.ID] then
-        MsgErr("[BASH.Commands:AddEntry(%s)]: A command with the ID '%s' already exists!", concatArgs(commTab), commTab.ID);
+        MsgErr("[BASH.Commands.AddCommand] -> A command with the ID '%s' already exists!", commTab.ID);
         return;
     end
     if #commTab.Keywords <= 0 then
-        MsgErr("[BASH.Commands:AddEntry(%s)]: Tried adding a command with no keywords!", concatArgs(commTab));
+        MsgErr("[BASH.Commands.AddCommand] -> Tried adding a command '%s' with no keywords!", commTab.ID);
         return;
     end
 
@@ -137,12 +137,12 @@ concommand.Add("bash", function(ply, cmd, args)
         MsgCon(color_green, false, "Valid commands:");
         for id, comm in SortedPairs(BASH.Commands.Entries) do
             if !comm.IsInScope then continue end;
-            MsgCon(color_green, false, "\t%s (%s):", comm.Name, comm.Desc);
-            MsgCon(color_white, false, "\t\tKeywords:");
+            MsgCon(color_white, false, "\t%s (%s):", comm.Name, comm.Desc);
+            MsgCon(color_blue, false, "\t\tKeywords:");
             for _, keyword in pairs(comm.Keywords) do
                 MsgCon(color_con, false, "\t\t\t%s", keyword);
             end
-            MsgCon(color_white, false, "\t\tArguments:");
+            MsgCon(color_cyan, false, "\t\tArguments:");
             if #comm.Arguments > 0 then
                 for _, argTab in ipairs(comm.Arguments) do
                     MsgCon(color_con, false, "\t\t\t%s (%s)", argTab[2], argTab[1]);
@@ -156,18 +156,18 @@ concommand.Add("bash", function(ply, cmd, args)
 
     local comm = BASH.Commands.KeywordRef[args[1]];
     if !comm then
-        MsgCon(color_red, false, "No command '%s' found!", args[1]);
+        MsgCon(color_darkred, false, "No command '%s' found!", args[1]);
     else
         if !comm.IsInScope then
-            MsgCon(color_red, false, "You're not allowed to do that within your current scope!");
+            MsgCon(color_darkred, false, "You're not allowed to do that within your current scope!");
             return;
         end
         if ply != NULL then
             if ply:GetAccessLevel() < comm.AccessLevel then
-                MsgCon(color_red, false, "You're not allowed to do that with your current access level! (%d < %d)", ply:GetAccessLevel(), comm.AccessLevel);
+                MsgCon(color_darkred, false, "You're not allowed to do that with your current access level! (%d < %d)", ply:GetAccessLevel(), comm.AccessLevel);
                 return;
             elseif comm.AccessFlag != "" && !ply:HasFlag(comm.AccessFlag) then
-                MsgCon(color_red, false, "You're not allowed to do that with your current flags! (Needed: %s)", comm.AccessFlag);
+                MsgCon(color_darkred, false, "You're not allowed to do that with your current flags! (Needed: %s)", comm.AccessFlag);
                 return;
             end
         end
@@ -184,11 +184,11 @@ concommand.Add("bash", function(ply, cmd, args)
             end
 
             if !args[index] and !isOptional then
-                MsgCon(color_red, false, "Argument #%d (%s - %s) is required but has not been supplied!", index, commType, commDesc);
+                MsgCon(color_darkred, false, "Argument #%d (%s - %s) is required but has not been supplied!", index, commType, commDesc);
                 return;
             end
             if type(args[index]) != commType and !isOptional then
-                MsgCon(color_red, false, "Argument #%d (%s - %s) has incorrect type! Supplied: %s", index, commType, commDesc, type(args[index]));
+                MsgCon(color_darkred, false, "Argument #%d (%s - %s) has incorrect type! Supplied: %s", index, commType, commDesc, type(args[index]));
                 return;
             end
             isOptional = false;

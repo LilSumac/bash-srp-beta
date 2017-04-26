@@ -7,6 +7,7 @@ BASH.SQL.Tables = BASH.SQL.Tables or {};
 BASH.SQL.ServerData = BASH.SQL.ServerData or {};
 BASH.SQL.Dependencies = {["Registry"] = SERVER};
 local Player = FindMetaTable("Player");
+local color_sql = Color(0, 151, 151, 255);
 
 /*  Movin on.
 if !mysqloo then
@@ -21,7 +22,7 @@ end
 /*
 **  BASH Hooks
 */
-function BASH:GatherSQLTables() end;
+function BASH:CreateSQLTables() end;
 function BASH:EditSQLTables() end;
 
 function BASH.SQL:Init()
@@ -70,9 +71,11 @@ function BASH.SQL:Init()
         }
     };
 
-    hook.Call("GatherSQLTables", BASH);
+    hook.Call("CreateSQLTables", BASH);
 	hook.Call("EditSQLTables", BASH);
-	
+
+    PrintTable(self.Tables);
+
 	if !tmysql then
         MsgErr("[BASH.SQL.Init] -> tmysql wasn't found!");
 		self.Tables = {};
@@ -99,6 +102,7 @@ function BASH.SQL:Init()
     else
         MsgCon(color_sql, "Database connected successfully!");
         self.Connected = true;
+        self:TableCheck();
     end
 end
 
@@ -129,7 +133,7 @@ function BASH.SQL:Query(query, sqlType, callback, obj)
 end
 
 function BASH.SQL:AddTable(sqlTab)
-    if !sqlTab or sqlTab.Name then return end;
+    if !sqlTab or !sqlTab.Name then return end;
     if self.Tables[sqlTab.Name] then
         MsgErr("[BASH.SQL.AddTable] -> A table with the name '%s' already exists!", sqlTab.Name);
         return;
@@ -168,7 +172,7 @@ function BASH.SQL:AddColumn(tableName, colName, colType, override)
         MsgErr("[BASH.SQL.AddColumn] -> A default SQL structure of the type '%s' doesn't exist!", colType);
         return;
     end
-	
+
 	if self.Tables[tableName].Struct[colName] then
 		if override then
 			MsgCon(color_sql, true, "Overriding column '%s' in table '%s'.", colName, tableName);
@@ -179,7 +183,7 @@ function BASH.SQL:AddColumn(tableName, colName, colType, override)
 	else
 		MsgCon(color_sql, true, "Adding column '%s' to table '%s'.", colName, tableName);
 	end
-	
+
 	self.Tables[tableName].Struct[colName] = SQL_TYPE[colType];
 end
 
@@ -231,7 +235,7 @@ end
 
 function BASH.SQL:ColumnCheck()
     if !self.Connected then return end;
-	
+
 	MsgCon(color_sql, true, "Creating missing columns in local DB...");
     local lCreate = self:Query("SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS;", SQL_LOCAL);
     if lCreate == false then
@@ -244,23 +248,23 @@ function BASH.SQL:ColumnCheck()
 				missing[name][colName] = col;
 			end
 		end
-		
+
 		for _, row in pairs(lCreate) do
 			if missing[row[1]][row[2]] then
 				missing[row[1]][row[2]] = nil;
 			end
 		end
-		
+
 		local missingQuery = "";
 		for tabName, tab in pairs(missing) do
 			if table.IsEmpty(tab) then continue end;
-			missingQuery = missingQuery .. Fmt("ALTER TABLE %s ADD(";, tabName);
+			missingQuery = missingQuery .. Fmt("ALTER TABLE %s ADD(", tabName);
 			for colName, col in pairs(tab) do
 				missingQuery = missingQuery .. Fmt("%s %s, ", colName, col);
 			end
 			missingQuery = string.sub(missingQuery, 1, string.len(missingQuery) - 2) .. "); ";
 		end
-		
+
 		local _missingQuery = self:Query(missingQuery, SQL_LOCAL);
 		if _missingQuery == false then
 			MsgErr("[BASH.SQL.ColumnCheck] -> Local column creation failed!");
@@ -268,7 +272,7 @@ function BASH.SQL:ColumnCheck()
 			MsgCon(color_sql, true, "Missing columns were created in local DB.");
 		end
     end
-	
+
 	local function gCreateCol(resultsTab)
 		for queryNum, results in pairs(resultsTab) do
 			if !results.status then
@@ -282,7 +286,7 @@ function BASH.SQL:ColumnCheck()
         MsgCon(color_sql, true, "Database initialization complete!");
 		hook.Call("PostSQLInit", BASH);
 	end
-	
+
 	local missing = {};
 	for name, sqlTab in pairs(self.Tables) do
 		missing[name] = {};
@@ -290,7 +294,7 @@ function BASH.SQL:ColumnCheck()
 			missing[name][colName] = col;
 		end
 	end
-	
+
 	local function gCheckCol(resultsTab)
 		local tabName, colName;
 		for queryNum, results in pairs(resultsTab) do
@@ -299,28 +303,28 @@ function BASH.SQL:ColumnCheck()
 				MsgErr(results.error);
 				continue;
 			end
-			
+
 			tabName = results.data["TABLE_NAME"];
 			colName = results.data["COLUMN_NAME"];
 			if missing[tabName] then
 				missing[tabName][colName] = nil;
 			end
 		end
-		
+
 		tabName, colName = nil, nil;
 		local missingQuery = "";
 		for tabName, tab in pairs(missing) do
 			if table.IsEmpty(tab) then continue end;
-			missingQuery = missingQuery .. Fmt("ALTER TABLE %s ADD(";, tabName);
+			missingQuery = missingQuery .. Fmt("ALTER TABLE %s ADD(", tabName);
 			for _colName, col in pairs(tab) do
 				missingQuery = missingQuery .. Fmt("%s %s, ", colName, col);
 			end
 			missingQuery = string.sub(missingQuery, 1, string.len(missingQuery) - 2) .. "); ";
 		end
-		
+
 		local _missingQuery = BASH.SQL:Query(missingQuery, SQL_GLOBAL, gCreateCol);
 	end
-	
+
 	MsgCon(color_sql, true, "Creating missing columns in global DB...");
 	local gCreate = self:Query("SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS;", SQL_GLOBAL, gCheckCol);
 end
@@ -470,12 +474,5 @@ function Player:SQLGather()
     end
     _sql:Query(query, SQL_GLOBAL, gatherCallback);
 end
-
-/*
-**
-*/
-hook.Add("PostLoadVariables", "BASH_DelaySQLInitForRegistry", function()
-    BASH.SQL:TableCheck();
-end);
 
 BASH:RegisterLib(BASH.SQL);

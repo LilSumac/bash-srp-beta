@@ -70,7 +70,7 @@ function BASH.Ranks:AddEntry(rankTab)
     rankTab.IsStaff = rankTab.IsStaff or false;
 
     self.Entries[rankTab.ID] = confTab;
-    MsgCon(color_green, false, "Registered rank with ID '%s'!", rankTab.ID);
+    MsgCon(color_darkgreen, false, "Registered rank with ID '%s'!", rankTab.ID);
 end
 
 function BASH.Ranks:GetStaff()
@@ -97,7 +97,7 @@ function Player:IsStaff()
 end
 
 /*
-**
+**  BASH Hooks
 */
 hook.Add("LoadVariables", "BASH_AddRankVariable", function()
     BASH.Registry:AddVariable{

@@ -5,13 +5,13 @@ BASH.Config.IDRef = BASH.Config.IDRef or {};
 BASH.Config.Groups = BASH.Config.Groups or {};
 BASH.Config.InitialSet = BASH.Config.InitialSet or false;
 BASH.Config.Dependencies = {["GUI"] = CLIENT};
+local color_config = Color(151, 151, 0, 255);
 
 local randumbNames = {
-    "Big Gay Retards",
-    "xxX_H4CK3RZ_AN0NYM0U5_Xxx",
-    "I'M A FUCKING IDIOT",
-    "The Best Server Ever",
-    "Big Dicks, No Chicks"
+    "Baco 'n Tanana",
+    "The Lizard Pee",
+    "xxx_ELITE_HACKERS_ANONYMOUS_xxx",
+    "Big Gay Retards"
 };
 function BASH.Config:Init()
     self:AddGroup("Base Config", "cog-alt");
@@ -120,14 +120,14 @@ function BASH.Config:AddGroup(name, icon)
 		MsgErr("[BASH.Config.AddGroup] -> Tried creating a group '%s' with a non-existant icon '%s'! Reverting to default cog.", name, icon);
 		icon = "cog-alt";
 	end
-	
+
 	local tab = {};
 	tab.Name = name;
 	tab.Icon = ICONS[icon or "cog-alt"];
 	tab.Entries = {};
 	tab.FileName = string.lower(BASH:GetSafeFilename(name));
-	
-    MsgCon(color_green, false, "Creating config group '%s'!", name);
+
+    MsgCon(color_config, false, "Creating config group '%s'!", name);
     table.insert(self.Groups, (name != "Unsorted" and #self.Groups > 0 and #self.Groups) or (#self.Groups + 1), tab);
 end
 
@@ -148,8 +148,8 @@ function BASH.Config:SetGroupIcon(name, icon)
 		MsgErr("[BASH.Config.SetGroupIcon] -> Tried setting the icon of group '%s' to a non-existant icon '%s'! Reverting to default cog.", name, icon);
 		icon = "cog-alt";
 	end
-	
-	MsgCon(color_green, false, "Setting icon of group '%s' to '%s'.", name, icon);
+
+	MsgCon(color_config, false, "Setting icon of group '%s' to '%s'.", name, icon);
 	group.Icon = ICONS[icon or "cog-alt"];
 end
 
@@ -179,7 +179,7 @@ function BASH.Config:AddEntry(confTab)
     if confTab.MenuElement == "DComboBox" then
         confTab.Options = confTab.Options or {"Option 1", "Option 2"};
     end
-	
+
 	local group = self:GetGroup(confTab.Group);
 	group.Entries[#group.Entries + 1] = confTab;
 end
@@ -196,19 +196,19 @@ function BASH.Config:Load()
         self.InitialSet = false;
         BASH:CreateFile("bash/config/setup.txt");
         BASH:WriteToFile("bash/config/setup.txt", "false", true);
-        MsgCon(color_red, false, "No config has been set yet. Be sure to do so before continuing server use.");
+        MsgCon(color_darkred, false, "No config has been set yet. Be sure to do so before continuing server use.");
         return;
     else
         self.InitialSet = tobool(file.Read("bash/config/setup.txt", "DATA"));
         if !self.InitialSet then
-            MsgCon(color_red, false, "No config has been set yet. Be sure to do so before continuing server use.");
+            MsgCon(color_darkred, false, "No config has been set yet. Be sure to do so before continuing server use.");
             return;
         end
     end
 
     local fileName, fileCont;
     for _, groupTab in pairs(self.Groups) do
-        fileName = "bash/config/" .. groupTab.FileName);
+        fileName = "bash/config/" .. groupTab.FileName;
         if !file.Exists(fileName, "DATA") then
             BASH:CreateFile(fileName);
 
@@ -221,6 +221,8 @@ function BASH.Config:Load()
             fileCont = file.Read(fileName, "DATA");
 			fileCont = von.deserialize(fileCont);
         end
+
+        MsgCon(color_config, true, "Loaded %n config entries from '%s'.", table.Count(fileCont), groupTab.Name);
 
         for __, confTab in pairs(groupTab.Entries) do
             confTab.Value = (fileCont[confTab.ID] != nil and detype(fileCont[confTab.ID], string.lower(confTab.Type))) or confTab.Default;
@@ -244,7 +246,7 @@ if SERVER then
 
         local fileName, groupCont;
         for _, groupTab in pairs(self.Groups) do
-            fileName = "bash/config/" .. groupTab.FileName);
+            fileName = "bash/config/" .. groupTab.FileName;
 
             groupCont = {};
             for __, confTab in pairs(groupTab.Entries) do
@@ -254,12 +256,14 @@ if SERVER then
 					groupCont[confTab.ID] = confTab.Default;
 				end
             end
-			
+
 			groupCont = von.serialize(groupCont);
             if !file.Exists(fileName, "DATA") then
                 BASH:CreateFile(fileName);
             end
-            BASH:WriteToFile(fileName, groupCont, true);
+            if BASH:WriteToFile(fileName, groupCont, true) then
+                MsgCon(color_config, true, "Saved %n config entries from '%s'.", table.Count(groupCont), groupTab.Name);
+            end
         end
     end
 
@@ -280,14 +284,14 @@ if SERVER then
     function BASH.Config:Set(id, value)
         if !self.IDRef[id] then
             local args = concatArgs(id, value);
-            MsgErr("[BASH.Config:Set(%s)]: Tried to set a non-existant config entry!", args);
+            MsgErr("[BASH.Config.Set] -> Tried to set a non-existant config entry!", args);
             return nil;
         end
         self.IDRef[id].Value = value;
     end
 
     function BASH.Config:Exit()
-        MsgCon(color_green, true, "Saving config...");
+        MsgCon(color_darkgreen, true, "Saving config...");
         self:Save();
     end
 
@@ -298,8 +302,7 @@ if CLIENT then
     **  Networking
     */
     net.Receive("BASH_CONFIG_INIT", function(len)
-        BASH.GUI:Open("menu_config");
-        BASH.IntroStage = 2;
+        BASH.SettingConfig = true;
     end);
 
     net.Receive("BASH_CONFIG_ISSET", function(len)
@@ -316,6 +319,13 @@ if CLIENT then
     end);
 
 elseif SERVER then
+    /*
+    **  BASH Hooks
+    */
+    hook.Add("OnRegister", "BASH_SendConfigOnRegister", function(ply)
+        BASH.Config:Send(ply);
+    end);
+
     /*
     **  Misc. Hooks
     */
@@ -348,7 +358,7 @@ elseif SERVER then
         end
 
         if !BASH.Config.InitialSet then
-            MsgCon(color_green, true, "Getting initial config from %s...", ply:Name());
+            MsgCon(color_darkgreen, true, "Getting initial config from %s...", ply:Name());
         end
         for id, value in pairs(entry) do
             BASH.Config:Set(id, value);
@@ -356,11 +366,11 @@ elseif SERVER then
     end);
 
     net.Receive("BASH_CONFIG_INIT_CANCEL", function(len, ply)
-        MsgCon(color_red, true, "%s has stopped the inital config process early!", ply:Name());
+        MsgCon(color_darkred, true, "%s has stopped the inital config process early!", ply:Name());
         ply.SettingConfig = false;
         BASH.Config.SettingUp = false;
     end);
-    
+
 end
 
 BASH:RegisterLib(BASH.Config);

@@ -154,7 +154,7 @@ end
 
 function MsgErr(text, ...)
     local text = Format(text, ...);
-    MsgCon(color_red, true, text);
+    MsgCon(color_darkred, true, text);
     BASH:WriteToLog(text, LOG_ERR);
 end
 
@@ -235,12 +235,14 @@ function BASH:IncludeFile(name, print)
 	end
 
 	if SERVER and print then
-		MsgCon(color_green, false, "Processed file '%s'.", fileName);
+		MsgCon(color_darkgreen, false, "Processed file '%s'.", fileName);
 	end
 end
 
 function BASH:IncludeDirectory(directory, print)
-	MsgCon(color_green, false, "Processing directory '%s'...", directory);
+    if print then
+        MsgCon(color_darkgreen, false, "--Processing directory '%s'...", directory);
+    end
 
 	local files, dirs = file.Find(directory .. "/*", "LUA", nameasc);
 	for _, file in pairs(files) do
@@ -258,9 +260,9 @@ end
 
 function BASH:ProcessCore(directory)
 	if !directory then
-		MsgCon(color_green, true, "Processing #!/BASH core...");
+		MsgCon(color_darkgreen, true, "--Processing #!/BASH core...");
 	else
-		MsgCon(color_green, true, "Processing '%s' core...", directory);
+		MsgCon(color_darkgreen, true, "--Processing '%s' core...", directory);
 	end
 
     local fullDir = self.FolderName .. "/gamemode/";
@@ -269,7 +271,7 @@ function BASH:ProcessCore(directory)
 		for _, dir in pairs(dirs) do
 			if CORE_DIRS[dir] then
 				dir = fullDir .. ((directory and directory .. "/") or "") .. dir;
-				self:IncludeDirectory(dir, !directory);
+				self:IncludeDirectory(dir, true);
 			end
 		end
 	end
@@ -281,24 +283,42 @@ function BASH:RegisterLib(lib)
     self.Libraries = self.Libraries or {};
     lib.Name = lib.Name or "Unnamed Library$" .. randomString(8);
     self.Libraries[lib.Name] = lib;
-    MsgCon(color_green, true, "Registered '%s' library.", lib.Name);
+    MsgCon(color_darkgreen, true, "Registered '%s' library.", lib.Name);
 end
 
 function BASH:LibInit()
     if !self.Libraries then return end;
 
-    for name, lib in pairs(self.Libraries) do
-        if !self:LibDepMet(self) or !lib.Init or lib.Initialized then continue end;
+    /*
+	**	These are special libs that need to be initialized before the others.
+	*/
+	local specials = {"Config", "Registry", "SQL"};
+	for _, lib in ipairs(specials) do
+        if !self.Libraries[lib] then continue end;
+        lib = self.Libraries[lib];
+        if !self:LibDepMet(lib) or !lib.Init or lib.Initialized then continue end;
 
-        MsgCon(color_green, true, "Initializing '%s' library...", lib.Name);
+		MsgCon(color_darkgreen, true, "--Initializing '%s' library...", lib.Name);
+		lib:Init();
+		lib.Initialized = true;
+		MsgCon(color_darkgreen, true, "--'%s' initialization complete!", lib.Name);
+	end
+	/*
+	**
+	*/
+
+    for name, lib in pairs(self.Libraries) do
+        if !self:LibDepMet(lib) or !lib.Init or lib.Initialized then continue end;
+
+        MsgCon(color_darkgreen, true, "--Initializing '%s' library...", name);
         lib:Init();
         lib.Initialized = true;
-        MsgCon(color_green, true, "'%s' initialization complete!", lib.Name);
+        MsgCon(color_darkgreen, true, "--'%s' initialization complete!", name);
     end
 end
 
 function BASH:LibDepMet(lib)
-    if !lib.Dependencies or table.Count(lib.Dependencies) == 0 then return true end;
+    if !lib.Dependencies or table.IsEmpty(lib.Dependencies) then return true end;
 
     local metDep = true;
     for dep, scope in pairs(lib.Dependencies) do
@@ -310,7 +330,7 @@ function BASH:LibDepMet(lib)
     end
 
     if !metDep then
-        MsgCon(color_red, true, "'%s' library not initialized due to dependency errors.", lib.Name);
+        MsgCon(color_darkred, true, "--'%s' library not initialized due to dependency errors.", lib.Name);
     end
     return metDep;
 end
@@ -337,8 +357,8 @@ function BASH:WriteToFile(name, text, overwrite)
 	local logFile = file.Open(name, (overwrite and 'w') or 'a', "DATA");
 	if !logFile then
         local args = concatArgs(name, text, overwrite);
-		MsgErr("[BASH:WriteToFile(%s)]: Couldn't write/append to file '%s'!", args, name);
-		return;
+		MsgErr("[BASH.WriteToFile] -> Couldn't write/append to file '%s'!", name);
+		return false;
 	end
 
 	if overwrite then
@@ -347,6 +367,7 @@ function BASH:WriteToFile(name, text, overwrite)
 		logFile:Write((logFile:Size() > 0 and "\n" or "") .. text);
 	end
 	logFile:Close();
+    return true;
 end
 
 function BASH:WriteToLog(text, logType)

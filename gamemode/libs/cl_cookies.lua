@@ -3,6 +3,7 @@ BASH.Cookies = {};
 BASH.Cookies.Name = "Cookies";
 BASH.Cookies.Entries = BASH.Cookies.Entries or {};
 cookie.GetBoolean = cookie.GetBoolean or cookie.GetNumber;
+local color_cookie = Color(0, 255, 255, 255);
 
 function BASH.Cookies:Init()
     /*
@@ -67,7 +68,7 @@ function BASH.Cookies:Init()
         MenuElement = "DCheckBox"
     };
 
-    hook.Call("LoadCookies", BASH);
+    hook.Call("CreateCookies", BASH);
 end
 
 /*

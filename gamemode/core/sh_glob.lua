@@ -1,11 +1,20 @@
 color_trans = Color(0, 0, 0, 0);
-color_con = Color(192, 192, 192, 255);
-color_red = Color(200, 0, 0, 255);
-color_green = Color(0, 200, 0, 255);
-color_blue = Color(0, 0, 200, 255);
-color_purple = Color(200, 0, 200, 255);
-color_sql = Color(0, 204, 204, 255);
-color_cookie = Color(204, 102, 0, 255);
+color_black = Color(0, 0, 0, 255);
+color_white = Color(255, 255, 255, 255);
+color_grey = Color(151, 151, 151, 255);
+color_con = Color(200, 200, 200, 255);
+color_darkred = Color(151, 0, 0, 255);
+color_red = Color(255, 0, 0, 255);
+color_darkgreen = Color(0, 151, 0, 255);
+color_green = Color(0, 255, 0, 255);
+color_darkblue = Color(0, 0, 151, 255);
+color_blue = Color(0, 0, 255, 255);
+color_beige = Color(151, 151, 0, 255);
+color_yellow = Color(255, 255, 0, 255);
+color_turquoise = Color(0, 151, 151, 255);
+color_cyan = Color(0, 255, 255, 255);
+color_purple = Color(151, 0, 151, 255);
+color_pink = Color(255, 0, 255, 255);
 
 CORE_DIRS = {
     ["core"] =      true, ["external"] =  true,

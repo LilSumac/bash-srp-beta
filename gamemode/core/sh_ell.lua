@@ -15,6 +15,6 @@ elseif SERVER then
     include("sh_util.lua");
 end
 
-MsgCon(color_green, true, "%s entry point! Base files processed.", BASH.Name);
+MsgCon(color_darkgreen, true, "--%s entry point! Base files processed.", BASH.Name);
 BASH:ProcessCore();
 BASH:Init();
