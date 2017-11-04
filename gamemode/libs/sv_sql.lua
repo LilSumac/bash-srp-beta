@@ -40,8 +40,7 @@ function BASH.SQL:Init()
         Type = SQL_GLOBAL,
         Scope = DATA_PLY,
         Struct = {
-			["SteamName"] = "TEXT NOT NULL",
-			["PlayerFlags"] = "TEXT NOT NULL"
+			["FirstLogin"] = "INT(10) NOT NULL"
         }
     };
 
@@ -82,25 +81,19 @@ function BASH.SQL:Init()
         return;
     end
 
-    if !BASH.Config.InitialSet then
-        MsgErr("[BASH.SQL.Init] -> Cannot setup the database until config has been initially set!");
-		self.Tables = {};
-        return;
-    end
-
-    self.DB = tmysql.Connect(
-        BASH.Config:Get("sql_host"), BASH.Config:Get("sql_user"),
-        BASH.Config:Get("sql_pass"), BASH.Config:Get("sql_name"),
-        BASH.Config:Get("sql_port"), nil, CLIENT_MULTI_STATEMENTS
+    local db, err = tmysql.Connect(
+        BASH.SQL.Hostname, BASH.SQL.Username,
+        BASH.SQL.Password, BASH.SQL.Database,
+        BASH.SQL.Port, nil, CLIENT_MULTI_STATEMENTS
     );
-    local status, err = self.DB:Connect();
 
-    if !status then
+    if err then
         MsgErr("[BASH.SQL.Init] -> Unable to connect to database!");
         MsgErr(err);
         self.Connected = false;
     else
-        MsgCon(color_sql, "Database connected successfully!");
+        MsgCon(color_sql, true, "Database connected successfully!");
+        self.DB = db;
         self.Connected = true;
         self:TableCheck();
     end
@@ -113,11 +106,11 @@ function BASH.SQL:Query(query, sqlType, callback, obj)
         return;
     end
 
-    query = sql.SQLStr(query, true);
     local _query;
     if sqlType == SQL_LOCAL then
+        //query = sql.SQLStr(query, true);
         _query = sql.Query(query);
-        if _query == false then
+        if !_query then
             MsgErr("[BASH.SQL.Query] -> Local SQL query failed! %s", query);
             return;
         else return _query end;
@@ -127,6 +120,7 @@ function BASH.SQL:Query(query, sqlType, callback, obj)
             return;
         end
 
+        //query = self.DB:Escape(query);
         _query = self.DB:Query(query, callback, obj);
         return _query;
     end
@@ -194,95 +188,122 @@ function BASH.SQL:TableCheck()
     local localQuery = "";
     for name, sqlTab in pairs(self.Tables) do
         if sqlTab.Type == SQL_GLOBAL then
-            globalQuery = globalQuery .. Fmt("CREATE TABLE IF NOT EXISTS '%s'(", name);
+            globalQuery = globalQuery .. Fmt("CREATE TABLE IF NOT EXISTS %s(", name);
             for colName, col in pairs(sqlTab.Struct) do
 				globalQuery = globalQuery .. Fmt("`%s` %s, ", colName, col);
             end
-            globalQuery = globalQuery .. Fmt("PRIMARY KEY('%s')); ", sqlTab.Key);
+            globalQuery = globalQuery .. Fmt("PRIMARY KEY(`%s`)); ", sqlTab.Key);
         elseif sqlTab.Type == SQL_LOCAL then
-            localQuery = localQuery .. Fmt("CREATE TABLE IF NOT EXISTS '%s'(", name);
+            localQuery = localQuery .. Fmt("CREATE TABLE IF NOT EXISTS %s(", name);
             for colName, col in pairs(sqlTab.Struct) do
 				localQuery = localQuery .. Fmt("`%s` %s, ", colName, col);
             end
-            localQuery = localQuery .. Fmt("PRIMARY KEY('%s')); ", sqlTab.Key);
+            localQuery = localQuery .. Fmt("PRIMARY KEY(`%s`)); ", sqlTab.Key);
         end
     end
 
-    MsgCon(color_sql, true, "Creating missing tables in local DB...");
-    local lCreate = self:Query(localQuery, SQL_LOCAL);
-    if lCreate == false then
-        MsgErr("[BASH.SQL.TableCheck] -> Local table creation returned an error!");
+    if localQuery != "" then
+        MsgCon(color_sql, true, "Creating missing tables in local DB...");
+        local lCreate = self:Query(localQuery, SQL_LOCAL);
+        if !lCreate then
+            MsgErr("[BASH.SQL.TableCheck] -> Local table creation returned an error!");
+        else
+            MsgCon(color_sql, true, "Missing tables were created in local DB.");
+        end
     else
-        MsgCon(color_sql, true, "Missing tables were created in local DB.");
+        MsgCon(color_sql, true, "No tables to be made in the local DB.");
     end
 
-    local function tableCallback(resultsTab)
-		for queryNum, results in pairs(resultsTab) do
-			if !results.status then
-				MsgErr("[BASH.SQL.TableCheck] -> Global table creation returned an error! The rest of the SQL init process has been stopped.");
-				MsgErr(results.error);
-				return;
-			end
-		end
+    if globalQuery != "" then
+        local function tableCallback(resultsTab)
+    		for queryNum, results in pairs(resultsTab) do
+    			if !results.status then
+    				MsgErr("[BASH.SQL.TableCheck] -> Global table creation returned an error! The rest of the SQL init process has been stopped.");
+    				MsgErr(results.error);
+    				return;
+    			end
+    		end
 
-        MsgCon(color_sql, true, "Missing tables were created in global DB.");
-        BASH.SQL:ColumnCheck();
+            MsgCon(color_sql, true, "Missing tables were created in global DB.");
+            BASH.SQL:ColumnCheck();
+        end
+
+        MsgCon(color_sql, true, "Creating missing tables in global DB...");
+        local gCreate = self:Query(globalQuery, SQL_GLOBAL, tableCallback);
+    else
+        MsgCon(color_sql, true, "No tables to be made in the global DB.");
     end
-
-    MsgCon(color_sql, true, "Creating missing tables in global DB...");
-    local gCreate = self:Query(globalQuery, SQL_GLOBAL, tableCallback);
 end
 
 function BASH.SQL:ColumnCheck()
     if !self.Connected then return end;
 
 	MsgCon(color_sql, true, "Creating missing columns in local DB...");
-    local lCreate = self:Query("SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS;", SQL_LOCAL);
-    if lCreate == false then
+    local lCreate = self:Query("SELECT * FROM sqlite_master WHERE type = \'table\';", SQL_LOCAL);
+    if !lCreate then
         MsgErr("[BASH.SQL.ColumnCheck] -> Local column check returned an error!");
     else
 		local missing = {};
 		for name, sqlTab in pairs(self.Tables) do
+            if sqlTab.Type != SQL_LOCAL then continue; end
+
 			missing[name] = {};
 			for colName, col in pairs(sqlTab.Struct) do
 				missing[name][colName] = col;
 			end
 		end
 
-		for _, row in pairs(lCreate) do
-			if missing[row[1]][row[2]] then
-				missing[row[1]][row[2]] = nil;
-			end
-		end
+        if !table.IsEmpty(missing) then
+            local colQuery;
+    		for _, tab in pairs(lCreate) do
+                colQuery = self:Query(Fmt("PRAGMA table_info(%s);", tab.name), SQL_LOCAL);
+                if !colQuery then continue; end
 
-		local missingQuery = "";
-		for tabName, tab in pairs(missing) do
-			if table.IsEmpty(tab) then continue end;
-			missingQuery = missingQuery .. Fmt("ALTER TABLE %s ADD(", tabName);
-			for colName, col in pairs(tab) do
-				missingQuery = missingQuery .. Fmt("%s %s, ", colName, col);
-			end
-			missingQuery = string.sub(missingQuery, 1, string.len(missingQuery) - 2) .. "); ";
-		end
+                for _, col in pairs(colQuery) do
+        			if missing[tab.name][col.name] then
+        				missing[tab.name][col.name] = nil;
+        			end
+                end
+    		end
 
-		local _missingQuery = self:Query(missingQuery, SQL_LOCAL);
-		if _missingQuery == false then
-			MsgErr("[BASH.SQL.ColumnCheck] -> Local column creation failed!");
-		else
-			MsgCon(color_sql, true, "Missing columns were created in local DB.");
-		end
+    		local missingQuery = "";
+    		for tabName, tab in pairs(missing) do
+    			if table.IsEmpty(tab) then continue end;
+    			missingQuery = missingQuery .. Fmt("ALTER TABLE %s ADD(", tabName);
+    			for colName, col in pairs(tab) do
+    				missingQuery = missingQuery .. Fmt("%s %s, ", colName, col);
+    			end
+    			missingQuery = string.sub(missingQuery, 1, string.len(missingQuery) - 2) .. "); ";
+    		end
+
+    		local _missingQuery = self:Query(missingQuery, SQL_LOCAL);
+    		if !_missingQuery then
+    			MsgErr("[BASH.SQL.ColumnCheck] -> Local column creation failed!");
+    		else
+    			MsgCon(color_sql, true, "Missing columns were created in local DB.");
+    		end
+        else
+            MsgCon(color_sql, true, "No missing columns to be made in local DB.");
+        end
     end
 
 	local function gCreateCol(resultsTab)
-		for queryNum, results in pairs(resultsTab) do
-			if !results.status then
-				MsgErr("[BASH.SQL.ColumnCheck] -> Global column creation returned an error! The rest of the SQL init process has been stopped.");
-				MsgErr(results.error);
-				return;
-			end
-		end
+        if resultsTab then
+    		for queryNum, results in pairs(resultsTab) do
+    			if !results.status then
+    				MsgErr("[BASH.SQL.ColumnCheck] -> Global column creation returned an error! The rest of the SQL init process has been stopped.");
+    				MsgErr(results.error);
+    				return;
+    			end
+    		end
+        end
 
-        MsgCon(color_sql, true, "Missing columns were created in global DB.");
+        if resultsTab then
+            MsgCon(color_sql, true, "Missing columns were created in global DB.");
+        else
+            MsgCon(color_sql, true, "No missing columns to be made in global DB.");
+        end
+
         MsgCon(color_sql, true, "Database initialization complete!");
 		hook.Call("PostSQLInit", BASH);
 	end
@@ -295,72 +316,56 @@ function BASH.SQL:ColumnCheck()
 		end
 	end
 
-	local function gCheckCol(resultsTab)
-		local tabName, colName;
-		for queryNum, results in pairs(resultsTab) do
-			if !results.status then
-				MsgErr("[BASH.SQL.ColumnCheck] -> Global column check returned an error! The rest of the SQL init process has been stopped.");
-				MsgErr(results.error);
-				continue;
-			end
+	local function gCheckCol(results)
+        results = results[1];
+        if !results.status then
+            MsgErr("[BASH.SQL.ColumnCheck] -> Global column check returned an error! The rest of the SQL init process has been stopped.");
+            MsgErr(results.error);
+            return;
+        end
 
-			tabName = results.data["TABLE_NAME"];
-			colName = results.data["COLUMN_NAME"];
-			if missing[tabName] then
-				missing[tabName][colName] = nil;
-			end
-		end
-
+        local tabName, colName;
+        for _, result in pairs(results.data) do
+            tabName = result["TABLE_NAME"];
+            colName = result["COLUMN_NAME"];
+            if missing[tabName] then
+                missing[tabName][colName] = nil;
+            end
+        end
 		tabName, colName = nil, nil;
+
 		local missingQuery = "";
 		for tabName, tab in pairs(missing) do
 			if table.IsEmpty(tab) then continue end;
 			missingQuery = missingQuery .. Fmt("ALTER TABLE %s ADD(", tabName);
-			for _colName, col in pairs(tab) do
-				missingQuery = missingQuery .. Fmt("%s %s, ", colName, col);
+			for colName, col in pairs(tab) do
+				missingQuery = missingQuery .. Fmt("%s %s %s, ", colName, col, (BASH.SQL.Tables[tabName].Key == colName and "PRIMARY KEY") or "");
 			end
 			missingQuery = string.sub(missingQuery, 1, string.len(missingQuery) - 2) .. "); ";
 		end
 
-		local _missingQuery = BASH.SQL:Query(missingQuery, SQL_GLOBAL, gCreateCol);
+        if missingQuery != "" then
+            local _missingQuery = BASH.SQL:Query(missingQuery, SQL_GLOBAL, gCreateCol);
+        else
+            gCreateCol();
+        end
 	end
 
 	MsgCon(color_sql, true, "Creating missing columns in global DB...");
-	local gCreate = self:Query("SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS;", SQL_GLOBAL, gCheckCol);
-end
-
-function BASH.SQL:GatherServerData()
-    if !BASH.SQl.Connected then return end;
-
-    local data, tableQuery = {}, nil;
-    for table, tableStruct in pairs(BASH.SQL.Tables) do
-        if tableStruct.DataScope == DATA_SERVER then
-            tableQuery = self:Query("SELECT * FROM " .. table .. ";");
-            if tableQuery then
-                //  There is no reason for there to be more than
-                //  one result row. Logically, the data should
-                //  be stored in different columns all in one
-                //  row for the independent server.
-                data[table] = tableQuery[1];
-            end
-        end
-    end
-
-    MsgCon(color_sql, true, "Gathered server data from %d tables!", table.Count(data));
-    self.ServerData = data;
+	local gCreate = self:Query(Fmt("SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = \'%s\';", self.Database), SQL_GLOBAL, gCheckCol);
 end
 
 function BASH.SQL:TableCleanup()
-	// utility func for dropping unused tables
+	if !self.Connected then return; end
 end
 
 function BASH.SQL:ColumnCleanup()
-	// utility func for dropping unused columns
+	if !self.Connected then return; end
 end
 
 function Player:SQLInit()
     if !BASH.SQL.Connected then return end;
-    if !CheckPly(self) then return end;
+    if !checkply(self) then return end;
 
     local steamID = self:SteamID();
     self.SQLData = nil;
@@ -379,7 +384,7 @@ function Player:SQLInit()
         return;
     elseif !nextPos then
         BASH.Registry.Queue:enqueue(steamID);
-        vnet.SendString("BASH_REGISTRY_PROGRESS", "Starting SQL process...");
+        vnet.SendString("BASH_REGISTRY_PROGRESS", "Starting SQL process...", self);
     end
 
     local _self = self;
@@ -388,25 +393,25 @@ function Player:SQLInit()
         if !results.status then
             MsgErr("[Player.SQLInit] -> Player SQL existance check returned an error! They're stuck in limbo!");
             MsgErr(results.error);
-            // do some error posting here
             return;
         end
 
         if table.IsEmpty(results.data) then
             _self:SQLCreate();
         else
+            _self.SQLData = _self.SQLData or {};
             _self.SQLData["bash_players"] = results.data;
             _self:SQLGather();
         end
     end
 
     local _sql = BASH.SQL;
-    _sql:Query(Fmt("SELECT * FROM bash_players WHERE SteamID = '%s';", steamID), SQL_GLOBAL, existsCallback);
+    _sql:Query(Fmt("SELECT * FROM bash_players WHERE SteamID = \'%s\';", steamID), SQL_GLOBAL, existsCallback);
 end
 
 function Player:SQLCreate()
     if !BASH.SQL.Connected then return end;
-    if !CheckPly(self) then return end;
+    if !checkply(self) then return end;
 
     local steamName, steamID = self:Name(), self:SteamID();
     local _self = self;
@@ -419,27 +424,54 @@ function Player:SQLCreate()
             return;
         end
 
-        _self.SQLData["bash_players"] = {
-            ["SteamName"] = steamName,
-            ["SteamID"] = steamID,
-            ["PlayerFlags"] = ""
-        };
+        _self.NewPlayer = true;
         _self:SQLGather();
     end
 
     local _sql = BASH.SQL;
     MsgCon(color_sql, true, "Creating a new player entry for %s (%s).", steamName, steamID);
     vnet.SendString("BASH_REGISTRY_PROGRESS", "Creating a new database entry for you...", self);
-    local query = Fmt(
-        "INSERT INTO bash_players(SteamName, SteamID, PlayerFlags) VALUES('%s', '%s', '');",
-        steamName, steamID
-    );
+
+    local plyVars = {};
+    local plyVals = {};
+    for name, var in pairs(BASH.Registry.Vars) do
+        if var.SQLTable == "bash_players" then
+            plyVars[#plyVars + 1] = name;
+            plyVals[#plyVals + 1] = var.Default;
+        end
+    end
+
+    local query = "INSERT INTO bash_players(SteamName, SteamID";
+    local addQuery = "";
+    for index = 1, #plyVars do
+        addQuery = Fmt("%s, %s", addQuery, plyVars[index]);
+    end
+    query = Fmt("%s%s) VALUES(\'%s\', \'%s\'", query, addQuery, steamName, steamID);
+    addQuery = "";
+    for index = 1, #plyVals do
+        if type(plyVals[index]) == "function" then
+            local val = plyVals[index]();
+            if type(val) == "string" then
+                addQuery = Fmt("%s, \'%s\'", addQuery, val);
+            else
+                addQuery = Fmt("%s, %s", addQuery, val);
+            end
+        elseif type(plyVals[index]) == "string" then
+            addQuery = Fmt("%s, \'%s\'", addQuery, plyVals[index]);
+        else
+            addQuery = Fmt("%s, %s", addQuery, plyVals[index]);
+        end
+    end
+    query = Fmt("%s%s);", query, addQuery);
+
     _sql:Query(query, SQL_GLOBAL, createCallback);
+    hook.Call("SQLCreate", BASH, self);
+
 end
 
 function Player:SQLGather()
     if !BASH.SQL.Connected then return end;
-    if !CheckPly(self) then return end;
+    if !checkply(self) then return end;
 
     local tabOrder, index = {}, 1;
     for name, sqlTab in pairs(BASH.SQL.Tables) do
@@ -450,6 +482,7 @@ function Player:SQLGather()
         end
     end
 
+    local steamName, steamID = self:Name(), self:SteamID();
     local _self = self;
     local function gatherCallback(resultsTab)
         for queryNum, results in pairs(resultsTab) do
@@ -460,6 +493,7 @@ function Player:SQLGather()
                 continue;
             end
 
+            _self.SQLData = _self.SQLData or {};
             _self.SQLData[tabOrder[queryNum]] = results.data;
         end
 
@@ -473,6 +507,7 @@ function Player:SQLGather()
         query = query .. Fmt("SELECT * FROM %s WHERE SteamID = '%s'; ", name, steamID);
     end
     _sql:Query(query, SQL_GLOBAL, gatherCallback);
+    hook.Call("SQLGather", BASH, self);
 end
 
 BASH:RegisterLib(BASH.SQL);

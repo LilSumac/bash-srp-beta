@@ -4,7 +4,9 @@ local BASH = BASH;
 **  GMod Hooks
 */
 function BASH:InitPostEntity()
+    MsgN(LocalPlayer():GetClass());
     net.Empty("BASH_PLAYER_INIT");
+    BASH.Intro = vgui.Create("bash_intro");
 end
 
 /*
@@ -26,4 +28,14 @@ hook.Add("HUDPaint", "BASH_HandleResChange", function()
         CENTER_Y = SCRH / 2;
         resChanged = false;
     end
+end);
+
+//  Debug info to be removed later.
+local lastUpdate, fps = 0, 0;
+hook.Add("PostRenderVGUI", "BASH_DebugFPS", function()
+    if CurTime() - lastUpdate > 0.2 then
+        fps = math.Round(1 / FrameTime());
+        lastUpdate = CurTime();
+    end
+    draw.SimpleText(fps, "bash-regular-24", SCRW, 0, color_green, TEXT_RIGHT, TEXT_TOP);
 end);

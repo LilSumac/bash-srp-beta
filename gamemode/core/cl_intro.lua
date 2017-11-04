@@ -231,7 +231,7 @@ function BASH.Intro:DrawSetup()
                 end
             end
 
-            local wid = (8 * #headers) + (24 * (#headers - 1));
+            local wid = (32 * #headers) - 24;
             for index = 1, #headers do
                 draw.Circle(
                     (CENTER_X - (wid / 2)) + (24 * (index - 1)) + 4,
@@ -289,6 +289,48 @@ function BASH.Intro:DrawSetup()
         nx.Paint = function(_self, _w, _h)
             draw.SimpleText(_self.DrawText, "bash-regular-36", _w / 2, 0, colAnim, TEXT_CENT, TEXT_TOP);
         end
+
+        elem.ContentWrapper = vgui.Create("BScroll", elem);
+        local contWrap = elem.ContentWrapper;
+        contWrap:SetPos(0, up + 60);
+        contWrap:CenterHorizontal();
+        contWrap:SetSize(w * 0.4, down - up - 96);
+        contWrap:SetBGColor(color_trans);
+
+        elem.Content = vgui.Create("EditablePanel", elem.ContentWrapper);
+        local cont = elem.Content;
+        cont.Paint = function() end
+        contWrap:AddItem(cont);
+    end
+
+    local step = self.CurStep;
+    if elements[step] then
+        elem.StepChildren[step] = {};
+        local len = #elements[step];
+        local height = (96 * len) - 24;
+        local curY = 0;
+        local curConf, cTitle, cDesc, cEntry;
+        for index, element in ipairs(elements[step]) do
+            curConf = BASH.Config.IDRef[element];
+            if !curConf then continue end;
+
+            cTitle = vgui.Create("DLabel", elem.Content);
+            cTitle:SetPos(0, curY);
+            cTitle:SetFont("bash-regular-24");
+            cTitle:SetText(curConf.Name);
+            cTitle:SizeToContents();
+            cTitle:SetVisible(BASH.Intro.CurStep);
+            elem.StepChildren[step][index] = cTitle;
+            curY = curY + cTitle:GetTall();
+
+            cDesc = vgui.Create("BLongText", elem);
+            cDesc:AlignTo(cTitle, ALIGN_BELOWLEFT);
+            cDesc:SetFont("bash-light-24");
+            cDesc:SetText(curConf.Desc);
+            //elem.StepChildren[step][index]
+        end
+        local x, y = cEntry:GetPos();
+        elem.Content:SetTall(y + cEntry:GetTall());
     end
 
     called = true;
@@ -300,4 +342,4 @@ local function introLogic()
         BASH.Intro["Draw" .. BASH.Intro.Stage](BASH.Intro);
     end
 end
-hook.Add("PostRenderVGUI", "BASH_DrawIntro", introLogic);
+//hook.Add("PostRenderVGUI", "BASH_DrawIntro", introLogic);

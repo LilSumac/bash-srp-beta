@@ -1,6 +1,7 @@
 local BASH = BASH;
 BASH.Modules = {};
 BASH.Modules.Name = "Modules";
+BASH.Modules.Entries = {};
 BASH.Modules.Loaded = {};
 
 function BASH.Modules:Init()
@@ -9,6 +10,11 @@ function BASH.Modules:Init()
 end
 
 function BASH.Modules:Load(modID, modPath, isSingleFile)
+    if !file.Exists((isSingleFile and modPath) or modPath .. "/sh_module.lua", "LUA") then
+        MsgErr("[BASH.Modules.Load] -> Module '%s' has no base file!", modID);
+        return;
+    end
+
     local MODULE = {
         UniqueID = modID,
         Path = modPath,
@@ -29,10 +35,6 @@ function BASH.Modules:Load(modID, modPath, isSingleFile)
         self:LoadEnts(modPath .. "/entities");
     end
 
-    if !file.Exists((isSingleFile and modPath) or modPath .. "/sh_module.lua", "LUA") then
-        MsgErr("[BASH.Modules:Load(%s)]: This module has no base file!", modID);
-        return;
-    end
     BASH:IncludeFile((isSingleFile and modPath) or modPath .. "/sh_module.lua");
 end
 

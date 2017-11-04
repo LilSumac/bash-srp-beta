@@ -22,7 +22,7 @@ end
 */
 function net.Empty(id, recip)
     if !id or util.NetworkStringToID(id) == 0 then
-        MsgErr("[net.Empty(%s)]: The supplied ID is not a valid network string!", id or "");
+        MsgErr("[net.Empty] -> The supplied ID is not a valid network string! (%s)", id or "");
         return;
     end
 
@@ -30,7 +30,7 @@ function net.Empty(id, recip)
     if CLIENT then
         net.SendToServer();
     else
-        if recip == true then
+        if recip == nil then
             recip = player.GetAll();
         else
             recip = recip or {};
@@ -144,7 +144,8 @@ end
 **  BASH Util Functions
 */
 function MsgCon(color, log, text, ...)
-    local text = Format(text, ...);
+    text = text or "";
+    text = Format(text, ...);
     MsgC(color, text .. '\n');
 
 	if log then
@@ -166,8 +167,7 @@ function MsgDebug(text, ...)
 end
 
 function checkply(ent)
-    if !ent then return false end;
-    return ent:IsValid() and ent:IsPlayer();
+    return IsValid(ent) and ent:IsPlayer();
 end
 
 function detype(var, typeStr)
@@ -219,6 +219,12 @@ function concatArgs(...)
     return str;
 end
 
+function getMaterial(mat)
+    BASH.MatCache = BASH.MatCache or {};
+    BASH.MatCache[mat] = BASH.MatCache[mat] or Material(mat);
+    return BASH.MatCache[mat];
+end
+
 function BASH:IncludeFile(name, print)
 	local fileName = string.GetFileFromFilename(name);
     if CORE_EXCLUDED[string.StripExtension(fileName)] then return end;
@@ -267,13 +273,14 @@ function BASH:ProcessCore(directory)
 
     local fullDir = self.FolderName .. "/gamemode/";
     local files, dirs = file.Find(fullDir .. ((directory and directory .. "/*") or "*"), "LUA", nameasc);
+    local dirPath;
 	if dirs then
-		for _, dir in pairs(dirs) do
-			if CORE_DIRS[dir] then
-				dir = fullDir .. ((directory and directory .. "/") or "") .. dir;
-				self:IncludeDirectory(dir, true);
-			end
-		end
+        for index, dir in ipairs(CORE_DIRS) do
+            if table.HasValue(dirs, dir) then
+                dirPath = fullDir .. (directory != nil and directory .. "/" or "") .. dir;
+                self:IncludeDirectory(dirPath, true);
+            end
+        end
 	end
 end
 
@@ -391,11 +398,11 @@ function BASH:GetLoggingFile(logType)
     end
 
     if !self[tabFile] then
-        MsgN("Opening initial " .. tabFile .. "...");
+        MsgCon(color_cyan, false, "Opening initial %s...", tabFile);
         self[tabFile] = file.Open(fileName, "a", "DATA");
         self[tabFileName] = fileName;
     elseif self[tabFileName] != fileName then
-        MsgN("Swapping over to next day's " .. tabFile .. ".");
+        MsgCon(color_cyan, false, "Turning over to the next day's %s.", tabFile);
         self[tabFile]:Close();
         self[tabFile] = file.Open(fileName, "a", "DATA");
         self[tabFileName] = fileName;

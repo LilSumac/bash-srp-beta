@@ -4,6 +4,7 @@ BASH.Config.Name = "Config";
 BASH.Config.IDRef = BASH.Config.IDRef or {};
 BASH.Config.Groups = BASH.Config.Groups or {};
 BASH.Config.InitialSet = BASH.Config.InitialSet or false;
+BASH.Config.SettingUp = BASH.Config.SettingUp or false;
 BASH.Config.Dependencies = {["GUI"] = CLIENT};
 local color_config = Color(151, 151, 0, 255);
 
@@ -21,7 +22,7 @@ function BASH.Config:Init()
     **  Create Default Config Entries
     **  General Settings
     */
-    self:AddEntry({
+    self:AddEntry{
         ID = "community_name",
         Name = "Community Name",
         Desc = "The name of the community you wish to advertise on this server.",
@@ -29,9 +30,9 @@ function BASH.Config:Init()
         MenuElement = "BTextEntry",
         Default = table.Random(randumbNames),
         AccessLevel = 100
-    }, "Base Config");
+    };
 
-    self:AddEntry({
+    self:AddEntry{
         ID = "community_website",
         Name = "Community Website",
         Desc = "The website that your community is hosted on. (Optional)",
@@ -39,67 +40,12 @@ function BASH.Config:Init()
         MenuElement = "BTextEntry",
         Default = "",
         AccessLevel = 100
-    }, "Base Config");
-
-    /*
-    **  SQL Settings
-    */
-    self:AddEntry({
-        ID = "sql_host",
-        Name = "SQL Host Address",
-        Desc = "The address of your SQL database.",
-        Type = "String",
-        MenuElement = "BTextEntry",
-        Default = "",
-        AccessLevel = 100
-    }, "Base Config");
-
-    self:AddEntry({
-        ID = "sql_user",
-        Name = "SQL Username",
-        Desc = "The username to log into your SQL database.",
-        Type = "String",
-        MenuElement = "BTextEntry",
-        Default = "",
-        AccessLevel = 100
-    }, "Base Config");
-
-    self:AddEntry({
-        ID = "sql_pass",
-        Name = "SQL Password",
-        Desc = "The password to log into your SQL database.",
-        Type = "String",
-        MenuElement = "BTextEntry",
-        Default = "",
-        AccessLevel = 100
-    }, "Base Config");
-
-    self:AddEntry({
-        ID = "sql_name",
-        Name = "SQL Database Name",
-        Desc = "The name of your SQL database.",
-        Type = "String",
-        MenuElement = "BTextEntry",
-        Default = "",
-        AccessLevel = 100
-    }, "Base Config");
-
-    self:AddEntry({
-        ID = "sql_port",
-        Name = "SQL Port",
-        Desc = "The port needed to connect to your SQL database. Use 3306 if you're unsure.",
-        Type = "Number",
-        MenuElement = "DNumberWang",
-        Default = 3306,
-        Min = 0,
-        Max = 9999,
-        AccessLevel = 100
-    }, "Base Config");
+    };
 
     /*
     **  Developer Settings
     */
-    self:AddEntry({
+    self:AddEntry{
         ID = "debug_enabled",
         Name = "Debug Enabled",
         Desc = "Whether or not debug messages will print to the server console. WARNING: This will result in HUGE logs. Only enable if necessary, and disable once you're done.",
@@ -107,7 +53,7 @@ function BASH.Config:Init()
         MenuElement = "DCheckBox",
         Default = false,
         AccessLevel = 100
-    }, "Base Config");
+    };
 
     hook.Call("LoadConfig", BASH);
     if CLIENT then return end;
@@ -216,10 +162,10 @@ function BASH.Config:Load()
             for __, confTab in pairs(groupTab.Entries) do
                 fileCont[confTab.ID] = confTab.Default;
             end
-            BASH:WriteToFile(fileName, von.serialize(fileCont), true);
+            BASH:WriteToFile(fileName, pon.encode(fileCont), true);
         else
             fileCont = file.Read(fileName, "DATA");
-			fileCont = von.deserialize(fileCont);
+			fileCont = pon.decode(fileCont);
         end
 
         MsgCon(color_config, true, "Loaded %n config entries from '%s'.", table.Count(fileCont), groupTab.Name);
@@ -257,7 +203,7 @@ if SERVER then
 				end
             end
 
-			groupCont = von.serialize(groupCont);
+			groupCont = pon.encode(groupCont);
             if !file.Exists(fileName, "DATA") then
                 BASH:CreateFile(fileName);
             end
@@ -302,11 +248,11 @@ if CLIENT then
     **  Networking
     */
     net.Receive("BASH_CONFIG_INIT", function(len)
-        BASH.IntroNewPly = true;
+        BASH.Config.SettingUp = true;
     end);
 
     net.Receive("BASH_CONFIG_ISSET", function(len)
-        BASH.InitialSet = net.ReadBool();
+        BASH.Config.InitialSet = net.ReadBool();
     end);
 
     vnet.Watch("BASH_CONFIG_GET", function(data)
@@ -319,13 +265,6 @@ if CLIENT then
     end);
 
 elseif SERVER then
-    /*
-    **  BASH Hooks
-    */
-    hook.Add("OnRegister", "BASH_SendConfigOnRegister", function(ply)
-        BASH.Config:Send(ply);
-    end);
-
     /*
     **  Misc. Hooks
     */

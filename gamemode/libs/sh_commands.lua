@@ -8,10 +8,10 @@ BASH.Commands.Dependencies = {["Ranks"] = true, ["SQL"] = SERVER};
 
 function BASH.Commands:Init()
     self:AddCommand{
-        ID = "initconfig",
+        ID = "confinit",
         Name = "Initialize Config",
         Desc = "Starts the inital config to be set up by the targeted player.",
-        Keywords = {"initconfig"},
+        Keywords = {"confinit"},
         Arguments = {
             {"string", "Player"}
         },
@@ -49,7 +49,7 @@ function BASH.Commands:Init()
     self:AddCommand{
         ID = "setowner",
         Name = "Set Owner",
-        Desc = "Add a player to the \'owner\' rank through the server console.",
+        Desc = "Add a player to the  \'owner\' rank through the server console.",
         Keywords = {"setowner"},
         Arguments = {
             {"string", "Player/Character"}
@@ -183,6 +183,7 @@ concommand.Add("bash", function(ply, cmd, args)
                 commType = string.Replace(commType, '*', '');
             end
 
+            args[index] = detype(args[index], commType);
             if !args[index] and !isOptional then
                 MsgCon(color_darkred, false, "Argument #%d (%s - %s) is required but has not been supplied!", index, commType, commDesc);
                 return;

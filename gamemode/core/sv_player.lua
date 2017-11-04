@@ -8,6 +8,7 @@ local Player = FindMetaTable("Player");
 */
 function BASH:PostEntInitialize(ply)
 	ply.Initialized = true;
+	self.Registry:SyncGlobals(ply);
 	ply:SQLInit();
 end
 
@@ -41,3 +42,7 @@ function Player:NoClip(clip)
 		self:GodDisable();
 	end
 end
+
+net.Receive("BASH_PLAYER_INIT", function(len, ply)
+	BASH:PostEntInitialize(ply);
+end);

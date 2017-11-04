@@ -17,10 +17,7 @@ color_purple = Color(151, 0, 151, 255);
 color_pink = Color(255, 0, 255, 255);
 
 CORE_DIRS = {
-    ["core"] =      true, ["external"] =  true,
-    ["hooks"] =     true, ["items"] =     true,
-    ["libs"] =      true, ["net"] =       true,
-    ["obj"] =       true, ["vgui"] =      true
+    "external", "core", "config", "hooks", "libs", "obj", "vgui"
 };
 CORE_EXCLUDED = {
     ["sh_ell"] =    true,
@@ -85,7 +82,7 @@ PREFIXES_SERVER = {"sv_"};
 PREFIXES_SHARED = {"sh_", "item_", "obj_", string.Explode('_', game.GetMap())[1] .. "_"};
 
 SQL_TYPE = {};
-SQL_TYPE["boolean"] = "TINYINT(4) UNSIGNED NOT NULL";
+SQL_TYPE["boolean"] = "TINYINT(1) UNSIGNED NOT NULL";
 SQL_TYPE["number"] = "INT(18) UNSIGNED NOT NULL";
 SQL_TYPE["string"] = "TEXT NOT NULL";
 
