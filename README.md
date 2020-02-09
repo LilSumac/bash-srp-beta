@@ -1,4 +1,1 @@
-# bash-srp-beta
-A STALKER-centered RP gamemode for Garry's Mod.
-
-I don't suggest reading the code directly on Github, as the website doesn't handle the specific GLua syntax well.
+This is a read-only repo of the second bash SRP iteration. It does not work on its own and serves only as a reference of past work. Use at your own risk.
